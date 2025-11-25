@@ -1,0 +1,51 @@
+{
+  "name": "wordpress-parser",
+  "version": "1.0.0",
+  "description": "WordPress site parser with authentication and bot protection bypass",
+  "main": "dist/parse_events.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "tsx src/parse_events.ts",
+    "dev": "tsx --inspect src/parse_events.ts",
+    "events": "tsx src/parse_events.ts",
+    "debug": "tsx src/debug_table.ts",
+    "api": "tsx src/api/server.ts",
+    "api:dev": "tsx --watch src/api/server.ts",
+    "api:build": "tsc && node dist/api/server.js"
+  },
+  "keywords": [
+    "puppeteer",
+    "parser",
+    "wordpress",
+    "scraper"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "compression": "^1.8.1",
+    "cors": "^2.8.5",
+    "dotenv": "^16.3.1",
+    "express": "^4.21.2",
+    "express-rate-limit": "^7.5.1",
+    "express-winston": "^4.2.0",
+    "helmet": "^7.2.0",
+    "puppeteer": "^24.31.0",
+    "puppeteer-extra": "^3.3.6",
+    "puppeteer-extra-plugin-stealth": "^2.11.2",
+    "swagger-jsdoc": "^6.2.8",
+    "swagger-ui-express": "^5.0.1",
+    "uuid": "^9.0.1",
+    "winston": "^3.18.3"
+  },
+  "devDependencies": {
+    "@types/compression": "^1.8.1",
+    "@types/cors": "^2.8.19",
+    "@types/express": "^4.17.25",
+    "@types/node": "^24.10.1",
+    "@types/swagger-jsdoc": "^6.0.4",
+    "@types/swagger-ui-express": "^4.1.8",
+    "@types/uuid": "^9.0.8",
+    "tsx": "^4.20.6",
+    "typescript": "^5.9.3"
+  }
+}
