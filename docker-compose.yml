@@ -15,6 +15,7 @@ services:
       NODE_ENV: production
       API_PORT: 3000
       API_HOST: 0.0.0.0  # Bind to all interfaces inside container
+      API_BASE_URL: ${API_BASE_URL:-https://scrapper.liorizhakidrums.com}
 
       # Loaded from .env file
       API_KEY: ${API_KEY}

@@ -68,6 +68,7 @@ jobs:
           API_KEY=${{ secrets.API_KEY }}
           API_PORT=3000
           API_HOST=0.0.0.0
+          API_BASE_URL=https://scrapper.liorizhakidrums.com
           NODE_ENV=production
           WP_LOGIN_URL=${{ secrets.WP_LOGIN_URL }}
           WP_USERNAME=${{ secrets.WP_USERNAME }}
