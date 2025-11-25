@@ -35,8 +35,21 @@ async function main(): Promise<void> {
     const browser: Browser = await puppeteer.launch({
         headless: process.env.HEADLESS === 'true',
         executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
-        args: ['--disable-blink-features=AutomationControlled', '--window-size=1920,1080', '--no-sandbox', '--disable-dev-shm-usage'],
-        defaultViewport: { width: 1920, height: 1080 }
+        args: [
+            '--disable-blink-features=AutomationControlled',
+            '--window-size=1920,1080',
+            '--no-sandbox',
+            '--disable-setuid-sandbox',
+            '--disable-dev-shm-usage',
+            '--disable-accelerated-2d-canvas',
+            '--no-first-run',
+            '--no-zygote',
+            '--disable-gpu',
+            '--disable-software-rasterizer',
+            '--disable-extensions'
+        ],
+        defaultViewport: { width: 1920, height: 1080 },
+        ignoreDefaultArgs: ['--disable-extensions']
     });
 
     const page: Page = await browser.newPage();
