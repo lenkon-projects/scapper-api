@@ -34,7 +34,8 @@ interface TcControlInfo {
 async function main(): Promise<void> {
     const browser: Browser = await puppeteer.launch({
         headless: process.env.HEADLESS === 'true',
-        args: ['--disable-blink-features=AutomationControlled', '--window-size=1920,1080', '--no-sandbox'],
+        executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
+        args: ['--disable-blink-features=AutomationControlled', '--window-size=1920,1080', '--no-sandbox', '--disable-dev-shm-usage'],
         defaultViewport: { width: 1920, height: 1080 }
     });
 

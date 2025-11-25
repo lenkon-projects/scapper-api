@@ -66,10 +66,12 @@ export async function executeParse(options: ParseOptions = {}): Promise<ParseRes
 
     const browser: Browser = await puppeteer.launch({
         headless,
+        executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
         args: [
             '--disable-blink-features=AutomationControlled',
             '--window-size=1920,1080',
-            '--no-sandbox'
+            '--no-sandbox',
+            '--disable-dev-shm-usage'
         ],
         defaultViewport: { width: 1920, height: 1080 }
     });
