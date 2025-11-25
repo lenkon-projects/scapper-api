@@ -1,0 +1,56 @@
+# Dependencies
+node_modules
+npm-debug.log
+yarn.lock
+package-lock.json
+
+# TypeScript
+*.tsbuildinfo
+
+# Environment
+.env
+.env.local
+.env.*.local
+.env.example
+
+# Build output (copied from builder stage)
+dist
+
+# Output and logs (mounted as volumes)
+output
+logs
+*.log
+
+# Screenshots
+*.png
+*.jpg
+*.jpeg
+
+# Git
+.git
+.gitignore
+.github
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+
+# Documentation
+README.md
+*.md
+
+# Claude Code
+.claude
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Test and coverage
+coverage
+test
+tests
+*.test.ts
+*.spec.ts
