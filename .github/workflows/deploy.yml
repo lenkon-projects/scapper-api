@@ -117,14 +117,17 @@ jobs:
             # Pull latest image
             docker compose pull
 
-            # Stop and remove old containers
-            docker compose down
+            # Stop and remove old containers (with volumes cleanup)
+            docker compose down --remove-orphans
 
-            # Start new containers
-            docker compose up -d
+            # Remove old images before starting new ones
+            docker image prune -af
 
-            # Clean up old images
-            docker image prune -af --filter "until=24h"
+            # Start new containers with fresh pull
+            docker compose up -d --force-recreate --pull always
+
+            # Clean up unused volumes
+            docker volume prune -f
 
             # Show status
             echo "=== Container Status ==="

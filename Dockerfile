@@ -1,7 +1,10 @@
 # ============================================
-# Stage 1: Builder
+# Stage 1: Builder (using official Puppeteer image)
 # ============================================
-FROM node:20-bookworm-slim AS builder
+FROM ghcr.io/puppeteer/puppeteer:latest AS builder
+
+# Switch to root for installing dependencies
+USER root
 
 WORKDIR /app
 
@@ -19,37 +22,12 @@ COPY src ./src
 RUN npm run build
 
 # ============================================
-# Stage 2: Production
+# Stage 2: Production (using official Puppeteer image)
 # ============================================
-FROM node:20-bookworm-slim
+FROM ghcr.io/puppeteer/puppeteer:latest
 
-# Install Chromium and dependencies for Puppeteer
-RUN apt-get update && apt-get install -y \
-    chromium \
-    chromium-sandbox \
-    fonts-liberation \
-    fonts-noto-color-emoji \
-    libappindicator3-1 \
-    libasound2 \
-    libatk-bridge2.0-0 \
-    libatk1.0-0 \
-    libcups2 \
-    libdbus-1-3 \
-    libdrm2 \
-    libgbm1 \
-    libgtk-3-0 \
-    libnspr4 \
-    libnss3 \
-    libx11-xcb1 \
-    libxcomposite1 \
-    libxdamage1 \
-    libxrandr2 \
-    xdg-utils \
-    --no-install-recommends \
-    && rm -rf /var/lib/apt/lists/*
-
-# Create non-root user
-RUN groupadd -r nodejs && useradd -r -g nodejs nodejs
+# Switch to root for setup
+USER root
 
 WORKDIR /app
 
@@ -63,16 +41,15 @@ RUN npm ci --only=production && npm cache clean --force
 # Copy built application from builder
 COPY --from=builder /app/dist ./dist
 
-# Create directories with proper permissions
+# Create directories with proper permissions for pptruser (UID 10042)
 RUN mkdir -p /app/output /app/logs && \
-    chown -R nodejs:nodejs /app
+    chown -R pptruser:pptruser /app
 
-# Set Puppeteer to use system Chromium
-ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true \
-    PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
+# Puppeteer's bundled Chrome is already configured in the base image
+# No need to set PUPPETEER_EXECUTABLE_PATH
 
-# Switch to non-root user
-USER nodejs
+# Switch to non-root user (pptruser from base image)
+USER pptruser
 
 # Expose port
 EXPOSE 3000

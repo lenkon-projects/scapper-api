@@ -37,3 +37,6 @@ Thumbs.db
 
 # Claude Code
 .claude/
+
+# Docker local overrides (for development only)
+docker-compose.override.yml
