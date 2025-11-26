@@ -108,6 +108,12 @@ jobs:
             cd /root/wordpress-parser
             mv .env.production .env
 
+            # Create output and logs directories with proper permissions
+            # pptruser in the Puppeteer container has UID 10042
+            mkdir -p output logs
+            chown -R 10042:10042 output logs
+            chmod -R 755 output logs
+
             # Login to GitHub Container Registry
             echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
 
