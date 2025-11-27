@@ -46,12 +46,12 @@ export class TelegramBotService {
     try {
       // Set bot commands for quick menu
       await this.bot.setMyCommands([
-        { command: "start", description: "🚀 Начать работу с ботом" },
-        { command: "help", description: "📖 Список команд" },
-        { command: "parseandsync", description: "🔄 Парсинг и синхронизация" },
-        { command: "events", description: "📅 Список событий" },
-        { command: "status", description: "✅ Статус бота" },
-        { command: "myid", description: "🆔 Узнать свой ID" },
+        { command: "start", description: "🚀 Start working with the bot" },
+        { command: "help", description: "📖 Command list" },
+        { command: "parseandsync", description: "🔄 Parse and sync" },
+        { command: "events", description: "📅 Events list" },
+        { command: "status", description: "✅ Bot status" },
+        { command: "myid", description: "🆔 Get your ID" },
       ]);
       console.log("✅ Bot menu commands set successfully");
     } catch (error) {
@@ -214,16 +214,12 @@ export class TelegramBotService {
           inline_keyboard: [
             [{ text: "🎭 Ozen", callback_data: "parse_ozen" }],
             [{ text: "🎫 Eventim", callback_data: "parse_eventim" }],
-            [{ text: "🔄 Оба источника", callback_data: "parse_both" }],
+            [{ text: "🔄 Both sources", callback_data: "parse_both" }],
           ],
         },
       };
 
-      await this.bot.sendMessage(
-        chatId,
-        "📋 Выберите источник для парсинга:",
-        opts
-      );
+      await this.bot.sendMessage(chatId, "📋 Select parsing source:", opts);
     });
 
     // Handle callback queries for parse source selection
@@ -243,7 +239,7 @@ export class TelegramBotService {
       // Check authorization
       if (!this.isUserAllowed(userId)) {
         await this.bot.answerCallbackQuery(query.id, {
-          text: "❌ Доступ запрещён",
+          text: "❌ Access denied",
           show_alert: true,
         });
         return;
@@ -253,12 +249,12 @@ export class TelegramBotService {
       const sourceNames: Record<string, string> = {
         parse_ozen: "🎭 Ozen",
         parse_eventim: "🎫 Eventim",
-        parse_both: "🔄 Оба источника",
+        parse_both: "🔄 Both sources",
       };
 
       if (messageId) {
         await this.bot.editMessageText(
-          `📋 Выбрано: ${sourceNames[data] || data}\n\n🔄 Запуск...`,
+          `📋 Selected: ${sourceNames[data] || data}\n\n🔄 Starting...`,
           { chat_id: chatId, message_id: messageId }
         );
       }
@@ -276,7 +272,7 @@ export class TelegramBotService {
         console.error("Error during parsing and synchronization:", error);
         await this.bot.sendMessage(
           chatId,
-          `❌ Ошибка: ${(error as Error).message}`
+          `❌ Error: ${(error as Error).message}`
         );
       }
     });
@@ -334,7 +330,7 @@ export class TelegramBotService {
   private async executeOzenParseAndSync(chatId: number): Promise<void> {
     await this.bot.sendMessage(
       chatId,
-      "🎭 [Ozen] Начинаю парсинг...\n\nЭто может занять некоторое время."
+      "🎭 [Ozen] Starting parsing...\n\nThis may take some time."
     );
 
     const parseResult = await executeParse({
@@ -344,26 +340,23 @@ export class TelegramBotService {
 
     await this.bot.sendMessage(
       chatId,
-      `✅ [Ozen] Парсинг завершён!\n\n📊 Всего событий: ${parseResult.events.length}\n📁 Файл: ${parseResult.outputFile}`
+      `✅ [Ozen] Parsing completed!\n\n📊 Total events: ${parseResult.events.length}\n📁 File: ${parseResult.outputFile}`
     );
 
     const activeEvents = parseResult.events.filter((e) => e.active === true);
     await this.bot.sendMessage(
       chatId,
-      `🔍 [Ozen] Найдено активных событий: ${activeEvents.length} из ${parseResult.events.length}`
+      `🔍 [Ozen] Active events found: ${activeEvents.length} of ${parseResult.events.length}`
     );
 
     if (activeEvents.length === 0) {
-      await this.bot.sendMessage(
-        chatId,
-        "⚠️ [Ozen] Нет активных событий для синхронизации"
-      );
+      await this.bot.sendMessage(chatId, "⚠️ [Ozen] No active events to sync");
       return;
     }
 
     await this.bot.sendMessage(
       chatId,
-      "🔄 [Ozen] Начинаю синхронизацию с Monday.com..."
+      "🔄 [Ozen] Starting sync with Monday.com..."
     );
 
     const mondayService = MondayService.getInstance();
@@ -375,13 +368,13 @@ export class TelegramBotService {
     );
 
     const summary = [
-      "✅ [Ozen] Синхронизация завершена!\n",
-      `📊 Результаты:`,
-      `• Обработано: ${syncResults.totalProcessed}`,
-      `• Успешно обновлено: ${syncResults.successfulUpdates}`,
-      `• Пропущено: ${syncResults.skipped}`,
-      `• Ошибок: ${syncResults.errors}`,
-      `\n⏰ Время: ${new Date().toLocaleString("ru-RU")}`,
+      "✅ [Ozen] Sync completed!\n",
+      `📊 Results:`,
+      `• Processed: ${syncResults.totalProcessed}`,
+      `• Successfully updated: ${syncResults.successfulUpdates}`,
+      `• Skipped: ${syncResults.skipped}`,
+      `• Errors: ${syncResults.errors}`,
+      `\n⏰ Time: ${new Date().toISOString()}`,
     ].join("\n");
 
     await this.bot.sendMessage(chatId, summary);
@@ -390,7 +383,7 @@ export class TelegramBotService {
   private async executeEventimParseAndSync(chatId: number): Promise<void> {
     await this.bot.sendMessage(
       chatId,
-      "🎫 [Eventim] Начинаю парсинг...\n\nЭто может занять некоторое время."
+      "🎫 [Eventim] Starting parsing...\n\nThis may take some time."
     );
 
     const scraper = new EventimScraper({
@@ -402,7 +395,7 @@ export class TelegramBotService {
 
     await this.bot.sendMessage(
       chatId,
-      `✅ [Eventim] Парсинг завершён!\n\n📊 Всего событий: ${parseResult.events.length}\n📁 Файл: ${parseResult.outputFile}`
+      `✅ [Eventim] Parsing completed!\n\n📊 Total events: ${parseResult.events.length}\n📁 File: ${parseResult.outputFile}`
     );
 
     // Convert EventimEvent[] to Event[] (all Eventim events are active)
@@ -417,20 +410,17 @@ export class TelegramBotService {
 
     await this.bot.sendMessage(
       chatId,
-      `🔍 [Eventim] Активных событий: ${activeEvents.length}`
+      `🔍 [Eventim] Active events: ${activeEvents.length}`
     );
 
     if (activeEvents.length === 0) {
-      await this.bot.sendMessage(
-        chatId,
-        "⚠️ [Eventim] Нет событий для синхронизации"
-      );
+      await this.bot.sendMessage(chatId, "⚠️ [Eventim] No events to sync");
       return;
     }
 
     await this.bot.sendMessage(
       chatId,
-      "🔄 [Eventim] Начинаю синхронизацию с Monday.com..."
+      "🔄 [Eventim] Starting sync with Monday.com..."
     );
 
     const mondayService = MondayService.getInstance();
@@ -442,13 +432,13 @@ export class TelegramBotService {
     );
 
     const summary = [
-      "✅ [Eventim] Синхронизация завершена!\n",
-      `📊 Результаты:`,
-      `• Обработано: ${syncResults.totalProcessed}`,
-      `• Успешно обновлено: ${syncResults.successfulUpdates}`,
-      `• Пропущено: ${syncResults.skipped}`,
-      `• Ошибок: ${syncResults.errors}`,
-      `\n⏰ Время: ${new Date().toLocaleString("ru-RU")}`,
+      "✅ [Eventim] Sync completed!\n",
+      `📊 Results:`,
+      `• Processed: ${syncResults.totalProcessed}`,
+      `• Successfully updated: ${syncResults.successfulUpdates}`,
+      `• Skipped: ${syncResults.skipped}`,
+      `• Errors: ${syncResults.errors}`,
+      `\n⏰ Time: ${new Date().toISOString()}`,
     ].join("\n");
 
     await this.bot.sendMessage(chatId, summary);
