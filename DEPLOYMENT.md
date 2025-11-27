@@ -1,415 +1,488 @@
-# Deployment Guide
+# Deployment Documentation
 
-Инструкция по развёртыванию WordPress Parser API на production сервер.
+This guide covers Docker deployment, production setup, and infrastructure configuration for the WordPress Events Management Platform.
 
-## Параметры развёртывания
+## Overview
 
-- **Домен**: scrapper.liorizhakidrums.com
-- **Сервер**: 72.62.43.253 (Ubuntu)
-- **SSH User**: root
-- **Email для SSL**: lenkon1@gmail.com
-- **Deployment**: GitHub Container Registry + docker-compose
+The platform is designed for production deployment using:
 
-## Шаг 1: Настройка DNS
+- **Docker** - Containerized application with multi-stage builds
+- **Docker Compose** - Multi-service orchestration
+- **nginx** - Reverse proxy with SSL termination
+- **GitHub Actions** - Automated CI/CD pipeline
+- **Ubuntu Server** - Recommended production environment
 
-1. Добавьте A record в настройках вашего DNS провайдера:
-   ```
-   Type: A
-   Name: scrapper (или @scrapper)
-   Value: 72.62.43.253
-   TTL: 3600
-   ```
+## Quick Deployment
 
-2. Дождитесь DNS propagation (обычно 5-30 минут, максимум 24 часа)
+### Prerequisites
 
-3. Проверьте DNS:
-   ```bash
-   nslookup scrapper.liorizhakidrums.com
-   # или
-   dig scrapper.liorizhakidrums.com
-   ```
+- Ubuntu 20.04+ server with root access
+- Domain name pointing to your server
+- GitHub repository access
+- Docker and Docker Compose installed
 
-## Шаг 2: Настройка сервера
-
-1. Подключитесь к серверу по SSH:
-   ```bash
-   ssh root@72.62.43.253
-   ```
-
-2. Скопируйте скрипт server-setup.sh на сервер:
-   ```bash
-   # На вашей машине
-   scp scripts/server-setup.sh root@72.62.43.253:~/
-   ```
-
-3. На сервере запустите скрипт:
-   ```bash
-   sudo bash ~/server-setup.sh
-   ```
-
-   Скрипт установит:
-   - Docker и Docker Compose
-   - Nginx
-   - Certbot (для Let's Encrypt)
-   - UFW firewall
-   - Fail2ban
-
-4. Скопируйте nginx конфигурацию:
-   ```bash
-   # На вашей машине
-   scp nginx/scrapper.liorizhakidrums.com.conf root@72.62.43.253:/etc/nginx/sites-available/
-   ```
-
-5. На сервере создайте symlink:
-   ```bash
-   sudo ln -s /etc/nginx/sites-available/scrapper.liorizhakidrums.com.conf /etc/nginx/sites-enabled/
-   ```
-
-6. Проверьте nginx конфигурацию:
-   ```bash
-   sudo nginx -t
-   ```
-
-7. Перезапустите nginx:
-   ```bash
-   sudo systemctl reload nginx
-   ```
-
-8. Скопируйте скрипт ssl-setup.sh и запустите его:
-   ```bash
-   # На вашей машине
-   scp scripts/ssl-setup.sh root@72.62.43.253:~/
-
-   # На сервере
-   sudo bash ~/ssl-setup.sh
-   ```
-
-   Скрипт получит SSL сертификат от Let's Encrypt и настроит автоматическое продление.
-
-## Шаг 3: Настройка GitHub
-
-### 3.1 Включить GitHub Container Registry
-
-1. Перейдите в Settings → Actions → General
-2. В разделе "Workflow permissions" выберите "Read and write permissions"
-3. Нажмите Save
-
-### 3.2 Добавить GitHub Secrets
-
-Перейдите в Settings → Secrets and variables → Actions и добавьте следующие secrets:
-
-**Обязательные secrets:**
-
-```
-SERVER_HOST = 72.62.43.253
-SERVER_USER = root
-SSH_PRIVATE_KEY = <содержимое вашего приватного SSH ключа>
-```
-
-Для получения SSH ключа:
-```bash
-# Если у вас уже есть ключ
-cat ~/.ssh/id_rsa
-
-# Если нет - создайте новый
-ssh-keygen -t rsa -b 4096 -C "your_email@example.com"
-cat ~/.ssh/id_rsa
-
-# И добавьте публичный ключ на сервер
-ssh-copy-id root@72.62.43.253
-```
-
-**API Configuration:**
-
-```
-API_KEY = <сгенерируйте безопасный UUID>
-```
-
-Для генерации API ключа:
-```bash
-# На Mac/Linux
-uuidgen
-
-# Или онлайн
-# https://www.uuidgenerator.net/
-```
-
-**WordPress credentials:**
-
-```
-WP_LOGIN_URL = https://ozentelaviv.com/wp-login.php
-WP_USERNAME = <ваш wordpress username>
-WP_PASSWORD = <ваш wordpress password>
-TARGET_URL = https://ozentelaviv.com/wp-admin/
-```
-
-## Шаг 4: Развёртывание
-
-1. Закоммитьте все изменения:
-   ```bash
-   git add .
-   git commit -m "Add Docker and deployment configuration"
-   git push origin main
-   ```
-
-2. GitHub Actions автоматически запустится и:
-   - Соберёт Docker образ
-   - Загрузит его в GitHub Container Registry
-   - Развернёт на сервер
-
-3. Следите за процессом в разделе "Actions" на GitHub
-
-4. Проверьте развёртывание:
-   ```bash
-   curl https://scrapper.liorizhakidrums.com/api/health
-   ```
-
-   Ожидаемый ответ:
-   ```json
-   {
-     "status": "ok",
-     "timestamp": "2024-01-01T00:00:00.000Z",
-     "uptime": 123.456
-   }
-   ```
-
-## Шаг 5: Проверка работы
-
-1. **Health check:**
-   ```bash
-   curl https://scrapper.liorizhakidrums.com/api/health
-   ```
-
-2. **Swagger документация:**
-   Откройте в браузере:
-   ```
-   https://scrapper.liorizhakidrums.com/api-docs
-   ```
-
-3. **Проверка SSL сертификата:**
-   Откройте в браузере и проверьте замок в адресной строке
-
-4. **Тест parse endpoint:**
-   ```bash
-   curl -X POST https://scrapper.liorizhakidrums.com/api/parse \
-     -H "Content-Type: application/json" \
-     -H "X-API-Key: <ваш-api-key>" \
-     -d '{}'
-   ```
-
-## Управление сервисом на сервере
-
-### Просмотр статуса
+### One-Command Setup
 
 ```bash
-ssh root@72.62.43.253
+# Clone repository
+git clone https://github.com/lenkon-projects/scapper-api.git
+cd scapper-api
 
-cd /root/wordpress-parser
+# Run server setup script
+sudo bash scripts/server-setup.sh
 
-# Статус контейнеров
-docker compose ps
+# Configure SSL
+sudo bash scripts/ssl-setup.sh
 
-# Логи в реальном времени
-docker compose logs -f
-
-# Последние 100 строк логов
-docker compose logs --tail=100
+# Configure environment and deploy
+cp .env.example .env
+# Edit .env with your configuration
+docker-compose up -d
 ```
 
-### Перезапуск сервиса
+## Docker Configuration
 
-```bash
-cd /root/wordpress-parser
+### Dockerfile
 
-# Перезапуск
-docker compose restart
+The application uses a multi-stage Docker build for optimization:
 
-# Полная пересборка
-docker compose down
-docker compose pull
-docker compose up -d
+```dockerfile
+# Stage 1: Builder
+FROM ghcr.io/puppeteer/puppeteer:latest AS builder
+# Install dependencies and build TypeScript
+
+# Stage 2: Production
+FROM ghcr.io/puppeteer/puppeteer:latest
+# Copy built app and run production
 ```
 
-### Проверка использования ресурсов
+**Features:**
+
+- Based on official Puppeteer image for browser automation
+- Non-root user (`pptruser`) for security
+- TypeScript compilation in builder stage
+- Production-only dependencies in final image
+- Health check endpoint monitoring
+
+### Docker Compose
+
+#### Production Configuration (`docker-compose.yml`)
+
+```yaml
+services:
+  api:
+    image: ghcr.io/${GITHUB_REPOSITORY}:latest
+    container_name: wordpress-parser-api
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:3000:3000" # Localhost only (nginx proxy)
+    environment:
+      NODE_ENV: production
+      API_PORT: 3000
+      API_HOST: 0.0.0.0
+      # ... all environment variables from .env
+    volumes:
+      - ./output:/app/output
+      - ./logs:/app/logs
+      - ./data:/app/data
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "require('http').get('http://localhost:3000/api/health', (r) => { process.exit(r.statusCode === 200 ? 0 : 1); })",
+        ]
+      interval: 30s
+      timeout: 10s
+      start_period: 40s
+      retries: 3
+```
+
+#### Development Override (`docker-compose.override.yml`)
+
+```yaml
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    volumes:
+      - ./src:/app/src:ro
+      - ./output:/app/output
+      - ./logs:/app/logs
+    environment:
+      NODE_ENV: development
+    ports:
+      - "3000:3000" # Direct access for development
+```
+
+### Environment Configuration
+
+#### Required Variables
 
 ```bash
-# Docker статистика
+# API Configuration
+API_KEY=550e8400-e29b-41d4-a716-446655440000  # UUID v4
+API_PORT=3000
+API_HOST=0.0.0.0
+API_BASE_URL=https://scrapper.liorizhakidrums.com
+
+# WordPress Credentials
+WP_LOGIN_URL=https://ozentelaviv.com/wp-login.php
+WP_USERNAME=your_admin_email@example.com
+WP_PASSWORD=your_secure_password
+TARGET_URL=https://ozentelaviv.com/wp-admin/
+
+# Monday.com Integration
+MONDAY_COM_API_KEY=your_monday_api_key_here
+MONDAY_COM_BOARD_ID=5086703491
+MONDAY_COM_EVENT_ID_COLUMN=text_mkxy6ra8
+MONDAY_COM_CAPACITY_COLUMN=numeric_mkxst6mx
+MONDAY_COM_TICKETS_SOLD_COLUMN=numeric_mkxsf3c8
+MONDAY_COM_UPDATE_DATE_COLUMN=date_mky2adca
+
+# Telegram Bot
+TELEGRAM_BOT_TOKEN=1234567890:ABCdefGHIjklMNOpqrsTUVwxyz
+TELEGRAM_ALLOWED_USER_IDS=123456789,987654321
+```
+
+## Server Setup
+
+### Automated Setup Script
+
+File: `scripts/server-setup.sh`
+
+```bash
+#!/bin/bash
+set -e
+
+echo "WordPress Parser API - Server Setup"
+
+# Update system
+apt-get update && apt-get upgrade -y
+
+# Install essential packages
+apt-get install -y curl wget git ufw fail2ban ca-certificates gnupg
+
+# Install Docker
+curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" > /etc/apt/sources.list.d/docker.list
+apt-get update
+apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+
+# Install nginx
+apt-get install -y nginx
+
+# Install Certbot
+apt-get install -y certbot python3-certbot-nginx
+
+# Configure firewall
+ufw allow OpenSSH
+ufw allow 'Nginx Full'
+ufw --force enable
+
+# Configure fail2ban
+cp /etc/fail2ban/jail.conf /etc/fail2ban/jail.local
+systemctl enable fail2ban
+systemctl start fail2ban
+
+# Start services
+systemctl enable docker nginx
+systemctl start docker nginx
+
+# Add user to docker group (if not root)
+if [ "$SUDO_USER" ]; then
+    usermod -aG docker $SUDO_USER
+fi
+
+echo "Server setup completed successfully!"
+```
+
+## GitHub Actions CI/CD
+
+### Workflow Configuration
+
+File: `.github/workflows/deploy.yml`
+
+```yaml
+name: Build and Deploy
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@v2
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v4
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=sha
+            latest
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v4
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+
+    steps:
+      - name: Deploy to server
+        uses: appleboy/ssh-action@v0.1.5
+        with:
+          host: ${{ secrets.HOST }}
+          username: ${{ secrets.USERNAME }}
+          key: ${{ secrets.SSH_KEY }}
+          script: |
+            cd /app/wordpress-parser
+            docker-compose pull
+            docker-compose up -d
+            docker system prune -f
+```
+
+### Required GitHub Secrets
+
+```bash
+# Server connection
+HOST=your.server.ip
+USERNAME=deploy-user
+SSH_KEY=your-private-ssh-key
+
+# Optional: Registry credentials (if using private registry)
+REGISTRY_USERNAME=your-username
+REGISTRY_PASSWORD=your-password
+```
+
+## Production Deployment
+
+### Step-by-Step Deployment
+
+#### 1. Server Preparation
+
+```bash
+# Clone repository
+git clone https://github.com/lenkon-projects/scapper-api.git
+cd scapper-api
+
+# Run setup script
+sudo bash scripts/server-setup.sh
+```
+
+#### 2. Domain Configuration
+
+```bash
+# Copy nginx configuration
+sudo cp nginx/scrapper.liorizhakidrums.com.conf /etc/nginx/sites-available/
+sudo ln -s /etc/nginx/sites-available/scrapper.liorizhakidrums.com.conf /etc/nginx/sites-enabled/
+
+# Test nginx configuration
+sudo nginx -t
+
+# Reload nginx
+sudo systemctl reload nginx
+```
+
+#### 3. SSL Certificate
+
+```bash
+# Run SSL setup script
+sudo bash scripts/ssl-setup.sh
+
+# Or manual setup
+sudo certbot --nginx -d your-domain.com
+```
+
+#### 4. Environment Configuration
+
+```bash
+# Copy environment template
+cp .env.example .env
+
+# Edit configuration
+nano .env
+# Add all required variables
+```
+
+#### 5. Deploy Application
+
+```bash
+# Pull and start containers
+docker-compose pull
+docker-compose up -d
+
+# Check status
+docker-compose ps
+docker-compose logs -f
+```
+
+### Health Checks
+
+```bash
+# Check container health
+docker-compose ps
+
+# Check application health
+curl https://your-domain.com/api/health
+
+# Check logs
+docker-compose logs api
+
+# Check nginx status
+sudo systemctl status nginx
+
+# Check SSL certificate
+curl -I https://your-domain.com
+```
+
+## Monitoring & Maintenance
+
+### Log Management
+
+#### Application Logs
+
+```bash
+# View live logs
+docker-compose logs -f api
+
+# View specific timeframe
+docker-compose logs --since="2023-11-27T10:00:00" api
+
+# Save logs to file
+docker-compose logs api > app.log
+```
+
+#### nginx Logs
+
+```bash
+# Access logs
+sudo tail -f /var/log/nginx/scrapper_access.log
+
+# Error logs
+sudo tail -f /var/log/nginx/scrapper_error.log
+
+# Log rotation
+sudo logrotate /etc/logrotate.d/nginx
+```
+
+### System Monitoring
+
+#### Resource Usage
+
+```bash
+# Docker container stats
 docker stats
 
-# Disk usage
-du -sh /root/wordpress-parser/output /root/wordpress-parser/logs
-
-# Очистка старых логов
-find /root/wordpress-parser/logs -name "*.log" -mtime +30 -delete
+# System resource usage
+htop
+df -h
+free -h
 ```
 
-### Проверка SSL сертификата
+#### Health Monitoring
 
 ```bash
-sudo certbot certificates
+# Application health check
+curl -f https://your-domain.com/api/health || echo "Health check failed"
 
-# Тест продления
-sudo certbot renew --dry-run
+# Service status
+sudo systemctl status nginx docker
+
+# Container health
+docker-compose ps
 ```
 
 ## Troubleshooting
 
-### Container не стартует
+### Common Issues
+
+#### Container Won't Start
 
 ```bash
-# Проверьте логи
-docker compose logs
+# Check logs
+docker-compose logs api
 
-# Проверьте статус
-docker compose ps
+# Check environment variables
+docker-compose config
 
-# Пересоздайте контейнеры
-docker compose down
-docker compose up -d
+# Restart services
+docker-compose down
+docker-compose up -d
 ```
 
-### Health check fails
+#### SSL Issues
 
 ```bash
-# Проверьте доступность локально
-curl http://localhost:3000/api/health
+# Test SSL certificate
+openssl s_client -connect your-domain.com:443
 
-# Проверьте логи
-docker compose logs api
+# Renew certificate
+sudo certbot renew --force-renewal
 
-# Зайдите в контейнер
-docker compose exec api sh
+# Check nginx SSL configuration
+sudo nginx -t
 ```
 
-### Puppeteer crashes
-
-Увеличьте memory limit в docker-compose.yml:
-
-```yaml
-deploy:
-  resources:
-    limits:
-      memory: 4G  # Вместо 2G
-```
-
-### SSL issues
+#### Application Errors
 
 ```bash
-# Проверьте сертификат
-sudo certbot certificates
+# Check application health
+curl https://your-domain.com/api/health
 
-# Попробуйте обновить
+# View application logs
+docker-compose logs -f api
+
+# Check WordPress connectivity
+docker-compose exec api wget -q --spider https://wordpress-site.com
+```
+
+### Security Updates
+
+#### Regular Updates
+
+```bash
+# Update system packages
+sudo apt update && sudo apt upgrade -y
+
+# Update Docker images
+docker-compose pull
+docker-compose up -d
+
+# Update SSL certificates
 sudo certbot renew
 
-# Если проблемы - пересоздайте
-sudo certbot delete --cert-name scrapper.liorizhakidrums.com
-sudo bash ~/ssl-setup.sh
+# Update application
+git pull origin main
+docker-compose up -d --build
 ```
 
-### Nginx errors
-
-```bash
-# Проверьте конфигурацию
-sudo nginx -t
-
-# Проверьте логи
-sudo tail -f /var/log/nginx/error.log
-sudo tail -f /var/log/nginx/scrapper.liorizhakidrums.com.error.log
-
-# Перезапустите nginx
-sudo systemctl reload nginx
-```
-
-### Rate limiting слишком строгий
-
-Отредактируйте `/etc/nginx/sites-available/scrapper.liorizhakidrums.com`:
-
-```nginx
-# Измените rate
-limit_req_zone $binary_remote_addr zone=api_limit:10m rate=30r/m;  # Было 10r/m
-```
-
-Затем:
-```bash
-sudo nginx -t
-sudo systemctl reload nginx
-```
-
-## Обслуживание
-
-### Ежедневно
-- Проверяйте `docker compose ps` и `docker compose logs --tail=50`
-- Убедитесь, что health check работает
-
-### Еженедельно
-- Проверяйте disk usage (output/ и logs/)
-- Просматривайте nginx access logs
-- Проверяйте SSL validity: `sudo certbot certificates`
-
-### Ежемесячно
-- Обновляйте систему: `sudo apt update && sudo apt upgrade -y`
-- Пересобирайте образы (push в main запустит GitHub Actions)
-- Проверяйте использование API
-
-### При необходимости
-- Очищайте старые output файлы
-- Ротируйте API keys
-- Обновляйте зависимости: `npm audit`
-
-## Полезные команды
-
-```bash
-# Мониторинг в реальном времени
-watch -n 5 'docker compose ps && docker stats --no-stream'
-
-# Backup данных
-tar -czf backup-$(date +%Y%m%d).tar.gz -C /root/wordpress-parser output logs .env
-
-# Восстановление из backup
-tar -xzf backup-20240101.tar.gz -C /root/wordpress-parser
-
-# Просмотр открытых портов
-sudo netstat -tlnp | grep -E '(3000|80|443)'
-
-# Проверка firewall
-sudo ufw status verbose
-```
-
-## Архитектура
-
-```
-Internet
-   ↓
-Nginx (443) → SSL/TLS
-   ↓
-Rate Limiting
-   ↓
-Nginx Reverse Proxy
-   ↓
-localhost:3000
-   ↓
-Docker Container (wordpress-parser-api)
-   ↓
-Node.js Express API + Puppeteer
-```
-
-## Безопасность
-
-- ✅ API bind только на localhost (127.0.0.1:3000)
-- ✅ Весь внешний трафик через Nginx с SSL
-- ✅ Rate limiting на Nginx уровне
-- ✅ API Key authentication
-- ✅ UFW firewall (только 22, 80, 443)
-- ✅ Fail2ban для SSH protection
-- ✅ Security headers (HSTS, CSP, etc.)
-- ✅ Non-root пользователь в контейнере
-- ✅ Resource limits на контейнер
-
-## Поддержка
-
-Если возникли проблемы:
-
-1. Проверьте логи: `docker compose logs`
-2. Проверьте GitHub Actions logs
-3. Проверьте nginx logs: `/var/log/nginx/`
-4. Обратитесь к разделу Troubleshooting выше
+This deployment documentation provides comprehensive coverage for production deployment, monitoring, and maintenance of the WordPress Events Management Platform.

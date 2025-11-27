@@ -53,3 +53,4 @@ test
 tests
 *.test.ts
 *.spec.ts
+env-secret-content.txt

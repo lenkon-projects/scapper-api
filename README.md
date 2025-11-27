@@ -1,178 +1,222 @@
-# WordPress Events Parser
+# WordPress Events Management Platform
 
-Node.js parser for extracting event data from WordPress admin panel with authentication and bot protection bypass.
+A comprehensive event management platform that automates WordPress event ticket scraping, provides REST API access, Telegram bot notifications, and Monday.com project management integration with Docker deployment.
 
-## Features
+## Architecture Overview
 
-- WordPress authentication with bot protection bypass (uPress/Cloudflare)
-- Parses events table from WordPress admin
-- Extracts minimal event data: active status, event ID, tickets sold, capacity
-- Saves results to JSON with timestamp
-- Takes full-page screenshot for verification
-- Configurable headless/visible browser mode
+This is a multi-service platform with the following components:
+
+- **🌐 REST API Server** - Express.js API with job queue system and Swagger documentation
+- **🤖 Telegram Bot** - Automated notifications and command interface with user authentication
+- **📊 Monday.com Integration** - Automatic project board synchronization with ticket data
+- **🔍 WordPress Scraper** - Puppeteer-based parser with bot protection bypass
+- **🐳 Docker Deployment** - Production-ready containerized deployment with nginx
+
+## Quick Start
+
+### Development Mode
+
+```bash
+# Install dependencies
+npm install
+
+# Build TypeScript
+npm run build
+
+# Start all services (API + Bot)
+npm run start:all:dev
+
+# Or start individually
+npm run api:dev    # API server only
+npm run bot:dev    # Telegram bot only
+```
+
+### Production Mode
+
+```bash
+# Docker deployment
+docker-compose up -d
+
+# Or build and run
+npm run build
+npm run start:all:prod
+```
+
+## Services & Ports
+
+- **API Server**: `http://localhost:3000`
+- **API Documentation**: `http://localhost:3000/api-docs`
+- **Health Check**: `http://localhost:3000/api/health`
+- **Telegram Bot**: Runs alongside API server
 
 ## Requirements
 
-- Node.js (v14+)
-- npm
+- **Node.js** (v18+)
+- **Docker & Docker Compose** (for production)
+- **TypeScript** (for development)
+- **WordPress Admin Access** (for parsing)
+- **Monday.com API Access** (for sync)
+- **Telegram Bot Token** (for notifications)
 
-## Installation
+## Key Features
+
+### REST API
+
+- Asynchronous job queue for parsing operations
+- JWT-less API key authentication
+- Rate limiting and security middleware
+- Comprehensive error handling and logging
+- OpenAPI/Swagger documentation
+- Health monitoring endpoints
+
+### Telegram Bot
+
+- User whitelist authentication system
+- Real-time parsing and sync notifications
+- Interactive command interface
+- Chat ID tracking and management
+- Error reporting and status updates
+
+### WordPress Scraper
+
+- Bot protection bypass (uPress/Cloudflare)
+- Stealth browser automation with Puppeteer
+- Hebrew text parsing with regex patterns
+- Screenshot verification
+- Timestamped JSON output
+
+### Monday.com Integration
+
+- Automatic board item synchronization
+- Event ID mapping with "OZ-" prefix
+- Capacity and ticket sales tracking
+- Update timestamp logging
+- Comprehensive error handling
+
+### DevOps & Production
+
+- Multi-stage Docker builds
+- nginx reverse proxy with SSL
+- GitHub Actions CI/CD pipeline
+- UFW firewall and fail2ban security
+- Winston logging with rotation
+
+## Core Scripts
 
 ```bash
-npm install
+# Parse and sync in one operation
+npm run parse:sync:dev
+npm run parse:sync:prod
+
+# Monday.com sync only
+npm run sync:monday:dev
+npm run sync:monday:prod
+
+# Test Monday.com integration
+npm run test:monday
+
+# Build for production
+npm run build
 ```
 
 ## Configuration
 
-Create a `.env` file with your WordPress credentials:
+The platform requires extensive environment configuration. Create a `.env` file with 50+ variables:
 
-```env
-# WordPress Login Credentials
-WP_LOGIN_URL=https://ozentelaviv.com/wp-login.php
-WP_USERNAME=your_email@example.com
+```bash
+# API Configuration
+API_KEY=your-uuid-v4-api-key
+API_PORT=3000
+API_HOST=0.0.0.0
+API_BASE_URL=https://your-domain.com
+
+# WordPress Credentials
+WP_LOGIN_URL=https://site.com/wp-login.php
+WP_USERNAME=your_username
 WP_PASSWORD=your_password
+TARGET_URL=https://site.com/wp-admin/
 
-# Target URLs to parse
-TARGET_URL=https://ozentelaviv.com/wp-admin/
+# Monday.com Integration
+MONDAY_COM_API_KEY=your_monday_api_key
+MONDAY_COM_BOARD_ID=your_board_id
+MONDAY_COM_EVENT_ID_COLUMN=text_column_id
+MONDAY_COM_CAPACITY_COLUMN=numeric_column_id
+MONDAY_COM_TICKETS_SOLD_COLUMN=numeric_column_id
+MONDAY_COM_UPDATE_DATE_COLUMN=date_column_id
 
-# Browser settings
+# Telegram Bot
+TELEGRAM_BOT_TOKEN=your_bot_token
+TELEGRAM_ALLOWED_USER_IDS=123456789,987654321
+
+# Browser Settings
 HEADLESS=true
 TIMEOUT=30000
 CLOSE_BROWSER=true
+
+# Rate Limiting
+RATE_LIMIT_WINDOW_MS=60000
+RATE_LIMIT_MAX_REQUESTS=10
 ```
 
-### Environment Variables
+## Data Flow
 
-- `WP_LOGIN_URL` - WordPress login page URL
-- `WP_USERNAME` - WordPress admin username/email
-- `WP_PASSWORD` - WordPress admin password
-- `HEADLESS` - Run browser in headless mode (`true`/`false`)
-- `TIMEOUT` - Page load timeout in milliseconds
-- `CLOSE_BROWSER` - Close browser after parsing (`true`/`false`)
+1. **WordPress Parsing** → Extract event data (ID, tickets sold, capacity, status)
+2. **JSON Storage** → Save timestamped files to `./output/events_[timestamp].json`
+3. **Monday.com Sync** → Update project board with latest ticket data
+4. **Telegram Notifications** → Send real-time updates to authorized users
+5. **API Access** → Provide REST endpoints for external integrations
 
-## Usage
+## Project Structure
 
-Run the parser:
-
-```bash
-npm run events
+```
+src/
+├── api/                     # REST API server
+│   ├── server.ts           # Express application
+│   ├── routes/             # API endpoints
+│   ├── controllers/        # Request handlers
+│   ├── services/           # Business logic
+│   ├── middleware/         # Auth, logging, error handling
+│   └── config/             # Swagger configuration
+├── bot/                     # Telegram bot
+│   ├── telegram-bot.ts     # Bot service
+│   └── services/           # Auth, notifications, chat tracking
+├── core/                    # WordPress scraper
+│   ├── scraper.ts          # Main parsing logic
+│   ├── types.ts            # TypeScript interfaces
+│   └── utils.ts            # Helper functions
+├── scripts/                 # Standalone utilities
+│   ├── parse_and_sync.ts   # Combined parse + Monday sync
+│   ├── sync_monday.ts      # Monday.com sync only
+│   └── test_monday_items.ts # Monday.com testing
+└── start.ts                # Multi-service startup
 ```
 
-Or directly:
+## Documentation
 
-```bash
-node parse_events.js
-```
+Detailed documentation is available in separate files:
 
-## Output
+- **[API.md](API.md)** - Complete REST API documentation with examples
+- **[BOT.md](BOT.md)** - Telegram bot setup, commands, and usage
+- **[DEPLOYMENT.md](DEPLOYMENT.md)** - Docker deployment and production setup
 
-The script creates an `output` directory with:
+## Security Features
 
-1. **JSON file** - `events_[timestamp].json` with parsed data
-2. **Screenshot** - `events_screenshot.png` for verification
+- API key authentication for all endpoints
+- Rate limiting to prevent abuse
+- CORS protection with configurable origins
+- Security headers via Helmet.js
+- User whitelist for Telegram bot access
+- Environment variable isolation
+- Container security with non-root user
 
-### JSON Structure
+## Monitoring & Logging
 
-```json
-[
-  {
-    "active": true,
-    "eventId": "146628",
-    "ticketsSold": {
-      "total": 4,
-      "capacity": 220
-    }
-  }
-]
-```
-
-### Fields Description
-
-- `active` (boolean) - Whether the event is currently active
-- `eventId` (string) - Unique event identifier
-- `ticketsSold.total` (number) - Total tickets sold (סה״כ)
-- `ticketsSold.capacity` (number) - Original event capacity (מלאי מקורי)
-
-## How It Works
-
-1. Launches Puppeteer with stealth plugin to bypass bot detection
-2. Waits for uPress/Cloudflare protection screen to pass
-3. Authenticates with WordPress credentials
-4. Navigates to events admin page (`edit.php?post_type=tc_events`)
-5. Parses the events table using CSS selectors:
-   - `td.column-event_active .tc-control` - for active status
-   - `td.column-tickets_sold` - for ticket data
-6. Extracts data using regex patterns for Hebrew text
-7. Saves results to JSON and takes screenshot
-
-## Debugging
-
-To debug with visible browser:
-
-```env
-HEADLESS=false
-CLOSE_BROWSER=false
-```
-
-This keeps the browser open after execution for manual inspection.
-
-### Debug Script
-
-Use `debug_table.js` to analyze table structure:
-
-```bash
-node debug_table.js
-```
-
-This shows:
-- Table headers and their classes
-- First row data structure
-- tc-control element details
-
-## Technical Details
-
-### Dependencies
-
-- `puppeteer` - Browser automation
-- `puppeteer-extra` - Plugin framework
-- `puppeteer-extra-plugin-stealth` - Bot detection bypass
-- `dotenv` - Environment configuration
-
-### Bot Protection Bypass
-
-The script uses several techniques:
-- Stealth plugin to hide automation indicators
-- Custom user agent
-- Webdriver property override
-- Delays to simulate human behavior
-- Proper viewport configuration
-
-## Troubleshooting
-
-**Login fails:**
-- Check credentials in `.env`
-- Set `HEADLESS=false` to watch the process
-- Increase delays if site is slow
-
-**Protection timeout:**
-- Script continues automatically after 20s timeout
-- Increase `TIMEOUT` value if needed
-
-**Table not found:**
-- Verify you have access to the events page
-- Check if table structure changed
-- Run `debug_table.js` to inspect current structure
-
-**Wrong data extracted:**
-- Table structure may have changed
-- Use `debug_table.js` to verify column classes
-- Update selectors in `parse_events.js` if needed
-
-## Security Notes
-
-- Never commit `.env` file (included in `.gitignore`)
-- Use `.env.example` as template
-- Credentials are loaded from environment variables only
+- Health check endpoints for uptime monitoring
+- Winston structured logging with rotation
+- Request/response logging with correlation IDs
+- Error tracking with stack traces
+- Performance metrics and timing
+- Docker container health checks
 
 ## License
 
