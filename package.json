@@ -6,6 +6,8 @@
   "scripts": {
     "build": "tsc",
     "start": "tsx src/parse_events.ts",
+    "start:all": "tsx src/start.ts",
+    "start:all:build": "npm run build && node dist/start.js",
     "dev": "tsx --inspect src/parse_events.ts",
     "events": "tsx src/parse_events.ts",
     "debug": "tsx src/debug_table.ts",
@@ -16,7 +18,9 @@
     "sync:monday:build": "npm run build && node dist/scripts/sync_monday.js",
     "parse:sync": "tsx src/scripts/parse_and_sync.ts",
     "parse:sync:build": "npm run build && node dist/scripts/parse_and_sync.js",
-    "test:monday": "tsx src/scripts/test_monday_items.ts"
+    "test:monday": "tsx src/scripts/test_monday_items.ts",
+    "bot": "tsx src/bot/telegram-bot.ts",
+    "bot:build": "npm run build && node dist/bot/telegram-bot.js"
   },
   "keywords": [
     "puppeteer",
@@ -27,6 +31,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@types/node-telegram-bot-api": "^0.64.13",
     "axios": "^1.13.2",
     "compression": "^1.8.1",
     "cors": "^2.8.5",
@@ -35,6 +40,7 @@
     "express-rate-limit": "^7.5.1",
     "express-winston": "^4.2.0",
     "helmet": "^7.2.0",
+    "node-telegram-bot-api": "^0.66.0",
     "puppeteer": "^24.31.0",
     "puppeteer-extra": "^3.3.6",
     "puppeteer-extra-plugin-stealth": "^2.11.2",

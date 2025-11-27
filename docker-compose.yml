@@ -44,10 +44,19 @@ services:
       # Logging
       LOG_LEVEL: ${LOG_LEVEL:-info}
 
+      # Telegram Bot Configuration
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
+      TELEGRAM_ALLOWED_USER_IDS: ${TELEGRAM_ALLOWED_USER_IDS}
+
+      # Monday.com Configuration
+      MONDAY_API_TOKEN: ${MONDAY_API_TOKEN}
+      MONDAY_BOARD_ID: ${MONDAY_BOARD_ID}
+
     volumes:
-      # Persistent storage for parsed data and logs
+      # Persistent storage for parsed data, logs, and bot data
       - ./output:/app/output
       - ./logs:/app/logs
+      - ./data:/app/data
 
     # Security settings
     security_opt:

@@ -42,7 +42,7 @@ RUN npm ci --only=production && npm cache clean --force
 COPY --from=builder /app/dist ./dist
 
 # Create directories with proper permissions for pptruser (UID 10042)
-RUN mkdir -p /app/output /app/logs && \
+RUN mkdir -p /app/output /app/logs /app/data && \
     chown -R pptruser:pptruser /app
 
 # Puppeteer's bundled Chrome is already configured in the base image
@@ -58,5 +58,5 @@ EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
     CMD node -e "require('http').get('http://localhost:3000/api/health', (r) => { process.exit(r.statusCode === 200 ? 0 : 1); })"
 
-# Start application
-CMD ["node", "dist/api/server.js"]
+# Start application (both API server and Telegram bot)
+CMD ["node", "dist/start.js"]

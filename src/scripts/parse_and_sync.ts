@@ -1,6 +1,7 @@
 import 'dotenv/config';
 import { executeParse } from '../core/scraper';
 import MondayService from '../api/services/monday.service';
+import { TelegramNotificationService } from '../bot/services/telegram-notification.service';
 
 /**
  * Parse & Sync Script
@@ -121,14 +122,43 @@ async function main() {
 
     } catch (error) {
         console.error('[ParseAndSync] Fatal error:');
+
+        let errorObj: Error;
         if (error instanceof Error) {
+            errorObj = error;
             console.error(`  Message: ${error.message}`);
             if (error.stack) {
                 console.error(`  Stack: ${error.stack}`);
             }
         } else {
+            errorObj = new Error(String(error));
             console.error(`  ${error}`);
         }
+
+        // Send notification to all Telegram users
+        try {
+            console.log('[ParseAndSync] Sending error notification to Telegram users...');
+            const notificationService = TelegramNotificationService.getInstance();
+            const formattedMessage = notificationService.formatErrorMessage(
+                errorObj,
+                'Parse and Sync Script'
+            );
+
+            const result = await notificationService.broadcastToAllUsers(formattedMessage);
+            console.log(`[ParseAndSync] Notification sent: ${result.sent} successful, ${result.failed} failed`);
+
+            if (result.failed > 0) {
+                const failedUsers = result.details
+                    .filter(d => !d.success)
+                    .map(d => `User ${d.userId}: ${d.error}`)
+                    .join('\n  ');
+                console.error(`[ParseAndSync] Failed notifications:\n  ${failedUsers}`);
+            }
+        } catch (notificationError) {
+            // Don't let notification errors crash the script
+            console.error('[ParseAndSync] Failed to send Telegram notification:', notificationError);
+        }
+
         process.exit(1);
     }
 }
