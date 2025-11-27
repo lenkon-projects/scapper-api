@@ -4,6 +4,8 @@ import { AuthService } from "./services/auth.service";
 import { ChatIdTrackerService } from "./services/chat-id-tracker.service";
 import { BotConfig } from "./types/bot.types";
 import { executeParse } from "../core/scraper";
+import { EventimScraper } from "../core/eventim-scraper";
+import { Event } from "../core/types";
 import MondayService from "../api/services/monday.service";
 
 dotenv.config();
@@ -188,71 +190,75 @@ export class TelegramBotService {
         return;
       }
 
-      try {
-        // Шаг 1: Начало парсинга
-        await this.bot.sendMessage(
-          chatId,
-          "🔄 Starting parsing...\n\nThis may take some time."
-        );
+      // Show source selection menu
+      const opts: TelegramBot.SendMessageOptions = {
+        reply_markup: {
+          inline_keyboard: [
+            [{ text: "🎭 Ozen", callback_data: "parse_ozen" }],
+            [{ text: "🎫 Eventim", callback_data: "parse_eventim" }],
+            [{ text: "🔄 Оба источника", callback_data: "parse_both" }],
+          ],
+        },
+      };
 
-        const parseResult = await executeParse({
-          headless: true,
-          closeAfter: true,
+      await this.bot.sendMessage(
+        chatId,
+        "📋 Выберите источник для парсинга:",
+        opts
+      );
+    });
+
+    // Handle callback queries for parse source selection
+    this.bot.on("callback_query", async (query) => {
+      const userId = query.from.id;
+      const chatId = query.message?.chat.id;
+      const messageId = query.message?.message_id;
+      const data = query.data;
+
+      if (!chatId || !data?.startsWith("parse_")) {
+        return;
+      }
+
+      // Answer callback to remove loading state
+      await this.bot.answerCallbackQuery(query.id);
+
+      // Check authorization
+      if (!this.isUserAllowed(userId)) {
+        await this.bot.answerCallbackQuery(query.id, {
+          text: "❌ Доступ запрещён",
+          show_alert: true,
         });
+        return;
+      }
 
-        // Шаг 2: Результаты парсинга
-        await this.bot.sendMessage(
-          chatId,
-          `✅ Parsing completed!\n\n📊 Total events: ${parseResult.events.length}\n📁 File: ${parseResult.outputFile}`
-        );
+      // Update the message to show selected option
+      const sourceNames: Record<string, string> = {
+        parse_ozen: "🎭 Ozen",
+        parse_eventim: "🎫 Eventim",
+        parse_both: "🔄 Оба источника",
+      };
 
-        // Шаг 3: Фильтрация активных событий
-        const activeEvents = parseResult.events.filter(
-          (e) => e.active === true
+      if (messageId) {
+        await this.bot.editMessageText(
+          `📋 Выбрано: ${sourceNames[data] || data}\n\n🔄 Запуск...`,
+          { chat_id: chatId, message_id: messageId }
         );
-        await this.bot.sendMessage(
-          chatId,
-          `🔍 Found active events: ${activeEvents.length} out of ${parseResult.events.length}`
-        );
+      }
 
-        if (activeEvents.length === 0) {
-          await this.bot.sendMessage(
-            chatId,
-            "⚠️ No active events for synchronization"
-          );
-          return;
+      try {
+        if (data === "parse_ozen") {
+          await this.executeOzenParseAndSync(chatId);
+        } else if (data === "parse_eventim") {
+          await this.executeEventimParseAndSync(chatId);
+        } else if (data === "parse_both") {
+          await this.executeOzenParseAndSync(chatId);
+          await this.executeEventimParseAndSync(chatId);
         }
-
-        // Шаг 4: Синхронизация с Monday.com
-        await this.bot.sendMessage(
-          chatId,
-          "🔄 Starting synchronization with Monday.com..."
-        );
-
-        const mondayService = MondayService.getInstance();
-        const syncTimestamp = new Date();
-        const syncResults = await mondayService.syncActiveEvents(
-          activeEvents,
-          syncTimestamp
-        );
-
-        // Шаг 5: Результаты синхронизации
-        const summary = [
-          "✅ Synchronization completed!\n",
-          `📊 Results:`,
-          `• Processed: ${syncResults.totalProcessed}`,
-          `• Successfully updated: ${syncResults.successfulUpdates}`,
-          `• Skipped: ${syncResults.skipped}`,
-          `• Errors: ${syncResults.errors}`,
-          `\n⏰ Time: ${new Date().toLocaleString("en-US")}`,
-        ].join("\n");
-
-        await this.bot.sendMessage(chatId, summary);
       } catch (error) {
         console.error("Error during parsing and synchronization:", error);
         await this.bot.sendMessage(
           chatId,
-          `❌ Error: ${(error as Error).message}`
+          `❌ Ошибка: ${(error as Error).message}`
         );
       }
     });
@@ -305,6 +311,129 @@ export class TelegramBotService {
         this.sendAccessDeniedMessage(msg.chat.id, userId);
       }
     });
+  }
+
+  private async executeOzenParseAndSync(chatId: number): Promise<void> {
+    await this.bot.sendMessage(
+      chatId,
+      "🎭 [Ozen] Начинаю парсинг...\n\nЭто может занять некоторое время."
+    );
+
+    const parseResult = await executeParse({
+      headless: true,
+      closeAfter: true,
+    });
+
+    await this.bot.sendMessage(
+      chatId,
+      `✅ [Ozen] Парсинг завершён!\n\n📊 Всего событий: ${parseResult.events.length}\n📁 Файл: ${parseResult.outputFile}`
+    );
+
+    const activeEvents = parseResult.events.filter((e) => e.active === true);
+    await this.bot.sendMessage(
+      chatId,
+      `🔍 [Ozen] Найдено активных событий: ${activeEvents.length} из ${parseResult.events.length}`
+    );
+
+    if (activeEvents.length === 0) {
+      await this.bot.sendMessage(
+        chatId,
+        "⚠️ [Ozen] Нет активных событий для синхронизации"
+      );
+      return;
+    }
+
+    await this.bot.sendMessage(
+      chatId,
+      "🔄 [Ozen] Начинаю синхронизацию с Monday.com..."
+    );
+
+    const mondayService = MondayService.getInstance();
+    const syncTimestamp = new Date();
+    const syncResults = await mondayService.syncActiveEvents(
+      activeEvents,
+      syncTimestamp,
+      "OZ-"
+    );
+
+    const summary = [
+      "✅ [Ozen] Синхронизация завершена!\n",
+      `📊 Результаты:`,
+      `• Обработано: ${syncResults.totalProcessed}`,
+      `• Успешно обновлено: ${syncResults.successfulUpdates}`,
+      `• Пропущено: ${syncResults.skipped}`,
+      `• Ошибок: ${syncResults.errors}`,
+      `\n⏰ Время: ${new Date().toLocaleString("ru-RU")}`,
+    ].join("\n");
+
+    await this.bot.sendMessage(chatId, summary);
+  }
+
+  private async executeEventimParseAndSync(chatId: number): Promise<void> {
+    await this.bot.sendMessage(
+      chatId,
+      "🎫 [Eventim] Начинаю парсинг...\n\nЭто может занять некоторое время."
+    );
+
+    const scraper = new EventimScraper({
+      headless: true,
+      closeAfter: true,
+    });
+
+    const parseResult = await scraper.execute();
+
+    await this.bot.sendMessage(
+      chatId,
+      `✅ [Eventim] Парсинг завершён!\n\n📊 Всего событий: ${parseResult.events.length}\n📁 Файл: ${parseResult.outputFile}`
+    );
+
+    // Convert EventimEvent[] to Event[] (all Eventim events are active)
+    const activeEvents: Event[] = parseResult.events.map((e) => ({
+      active: true,
+      eventId: e.eventId,
+      ticketsSold: {
+        total: e.ticketsSold.total,
+        capacity: e.ticketsSold.capacity,
+      },
+    }));
+
+    await this.bot.sendMessage(
+      chatId,
+      `🔍 [Eventim] Активных событий: ${activeEvents.length}`
+    );
+
+    if (activeEvents.length === 0) {
+      await this.bot.sendMessage(
+        chatId,
+        "⚠️ [Eventim] Нет событий для синхронизации"
+      );
+      return;
+    }
+
+    await this.bot.sendMessage(
+      chatId,
+      "🔄 [Eventim] Начинаю синхронизацию с Monday.com..."
+    );
+
+    const mondayService = MondayService.getInstance();
+    const syncTimestamp = new Date();
+    const syncResults = await mondayService.syncActiveEvents(
+      activeEvents,
+      syncTimestamp,
+      "ZAP-"
+    );
+
+    const summary = [
+      "✅ [Eventim] Синхронизация завершена!\n",
+      `📊 Результаты:`,
+      `• Обработано: ${syncResults.totalProcessed}`,
+      `• Успешно обновлено: ${syncResults.successfulUpdates}`,
+      `• Пропущено: ${syncResults.skipped}`,
+      `• Ошибок: ${syncResults.errors}`,
+      `\n⏰ Время: ${new Date().toLocaleString("ru-RU")}`,
+    ].join("\n");
+
+    await this.bot.sendMessage(chatId, summary);
   }
 
   private sendAccessDeniedMessage(chatId: number, userId?: number): void {
