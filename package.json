@@ -11,7 +11,12 @@
     "debug": "tsx src/debug_table.ts",
     "api": "tsx src/api/server.ts",
     "api:dev": "tsx --watch src/api/server.ts",
-    "api:build": "tsc && node dist/api/server.js"
+    "api:build": "tsc && node dist/api/server.js",
+    "sync:monday": "tsx src/scripts/sync_monday.ts",
+    "sync:monday:build": "npm run build && node dist/scripts/sync_monday.js",
+    "parse:sync": "tsx src/scripts/parse_and_sync.ts",
+    "parse:sync:build": "npm run build && node dist/scripts/parse_and_sync.js",
+    "test:monday": "tsx src/scripts/test_monday_items.ts"
   },
   "keywords": [
     "puppeteer",
@@ -22,6 +27,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "axios": "^1.13.2",
     "compression": "^1.8.1",
     "cors": "^2.8.5",
     "dotenv": "^16.3.1",
