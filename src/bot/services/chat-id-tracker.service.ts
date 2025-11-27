@@ -1,6 +1,6 @@
-import * as fs from 'fs';
-import * as path from 'path';
-import { ChatIdMapping } from '../types/bot.types';
+import * as fs from "fs";
+import * as path from "path";
+import { ChatIdMapping } from "../types/bot.types";
 
 interface StorageFile {
   mappings: ChatIdMapping[];
@@ -11,9 +11,10 @@ export class ChatIdTrackerService {
   private static instance: ChatIdTrackerService;
   private storageFilePath: string;
   private cache: Map<number, ChatIdMapping>;
+  private isWritable: boolean = true;
 
   private constructor() {
-    this.storageFilePath = path.join(process.cwd(), 'data', 'chat_ids.json');
+    this.storageFilePath = path.join(process.cwd(), "data", "chat_ids.json");
     this.cache = new Map();
     this.loadFromFile();
   }
@@ -46,7 +47,9 @@ export class ChatIdTrackerService {
     this.saveToFile();
 
     console.log(
-      `[ChatIdTracker] Tracked chat ID for user ${userId} (${username || firstName || 'unknown'})`
+      `[ChatIdTracker] Tracked chat ID for user ${userId} (${
+        username || firstName || "unknown"
+      })`
     );
   }
 
@@ -87,18 +90,18 @@ export class ChatIdTrackerService {
 
       // Check if file exists
       if (!fs.existsSync(this.storageFilePath)) {
-        console.log('[ChatIdTracker] Storage file not found, creating new one');
+        console.log("[ChatIdTracker] Storage file not found, creating new one");
         this.saveToFile();
         return;
       }
 
       // Read and parse
-      const data = fs.readFileSync(this.storageFilePath, 'utf-8');
+      const data = fs.readFileSync(this.storageFilePath, "utf-8");
       const parsed: StorageFile = JSON.parse(data);
 
       // Validate structure
       if (!parsed.mappings || !Array.isArray(parsed.mappings)) {
-        throw new Error('Invalid file structure');
+        throw new Error("Invalid file structure");
       }
 
       // Load into cache
@@ -109,15 +112,15 @@ export class ChatIdTrackerService {
 
       console.log(`[ChatIdTracker] Loaded ${this.cache.size} chat ID mappings`);
     } catch (error) {
-      console.error('[ChatIdTracker] Error loading chat IDs:', error);
-      console.log('[ChatIdTracker] Starting with empty cache');
+      console.error("[ChatIdTracker] Error loading chat IDs:", error);
+      console.log("[ChatIdTracker] Starting with empty cache");
       this.cache.clear();
 
       // Try to save empty state
       try {
         this.saveToFile();
       } catch (saveError) {
-        console.error('[ChatIdTracker] Cannot save to file:', saveError);
+        console.error("[ChatIdTracker] Cannot save to file:", saveError);
       }
     }
   }
@@ -126,7 +129,18 @@ export class ChatIdTrackerService {
    * Save mappings to file
    */
   private saveToFile(): void {
+    // Skip if we already know the file is not writable
+    if (!this.isWritable) {
+      return;
+    }
+
     try {
+      // Ensure directory exists
+      const dir = path.dirname(this.storageFilePath);
+      if (!fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true });
+      }
+
       const data: StorageFile = {
         mappings: Array.from(this.cache.values()),
         lastUpdated: new Date().toISOString(),
@@ -135,10 +149,19 @@ export class ChatIdTrackerService {
       fs.writeFileSync(
         this.storageFilePath,
         JSON.stringify(data, null, 2),
-        'utf-8'
+        "utf-8"
       );
-    } catch (error) {
-      console.error('[ChatIdTracker] Error saving chat IDs:', error);
+    } catch (error: any) {
+      // Mark as not writable to avoid repeated errors
+      if (error?.code === "EACCES" || error?.code === "EROFS") {
+        console.warn(
+          `[ChatIdTracker] Storage not writable (${error.code}), running in memory-only mode. ` +
+            "Chat ID mappings will not persist across restarts."
+        );
+        this.isWritable = false;
+      } else {
+        console.error("[ChatIdTracker] Error saving chat IDs:", error);
+      }
     }
   }
 }

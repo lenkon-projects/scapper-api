@@ -3,6 +3,8 @@ services:
     image: ghcr.io/${GITHUB_REPOSITORY:-ivansh/parse_tickets}:latest
     container_name: wordpress-parser-api
     restart: unless-stopped
+    # Run as pptruser (UID 10042) from the puppeteer base image
+    user: "10042:10042"
 
     # Bind to localhost only (nginx will proxy)
     ports:

@@ -45,6 +45,15 @@ COPY --from=builder /app/dist ./dist
 RUN mkdir -p /app/output /app/logs /app/data && \
     chown -R pptruser:pptruser /app
 
+# Create entrypoint script to fix permissions at runtime (for mounted volumes)
+RUN echo '#!/bin/sh\n\
+    # Fix permissions for mounted volumes (if running as root via --user)\n\
+    if [ "$(id -u)" = "0" ]; then\n\
+    chown -R pptruser:pptruser /app/output /app/logs /app/data 2>/dev/null || true\n\
+    exec su-exec pptruser "$@"\n\
+    fi\n\
+    exec "$@"' > /app/entrypoint.sh && chmod +x /app/entrypoint.sh
+
 # Puppeteer's bundled Chrome is already configured in the base image
 # No need to set PUPPETEER_EXECUTABLE_PATH
 

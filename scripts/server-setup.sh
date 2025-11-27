@@ -89,8 +89,10 @@ echo "✅ Fail2ban started and enabled"
 
 # Create application directory
 echo "📁 Creating application directories..."
-mkdir -p /root/wordpress-parser/{output,logs}
+mkdir -p /root/wordpress-parser/{output,logs,data}
 chmod 755 /root/wordpress-parser
+# Set ownership for directories to match pptruser UID in container (10042)
+chown -R 10042:10042 /root/wordpress-parser/output /root/wordpress-parser/logs /root/wordpress-parser/data
 
 echo "✅ Application directories created"
 
