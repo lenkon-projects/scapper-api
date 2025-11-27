@@ -10,55 +10,16 @@ services:
     ports:
       - "127.0.0.1:3000:3000"
 
+    # Load all environment variables from .env file
+    env_file:
+      - .env
+
+    # Override specific variables if needed
     environment:
-      # API Configuration
       NODE_ENV: production
-      API_PORT: 3000
       API_HOST: 0.0.0.0  # Bind to all interfaces inside container
-      API_BASE_URL: ${API_BASE_URL:-https://scrapper.liorizhakidrums.com}
-
-      # Loaded from .env file
-      API_KEY: ${API_KEY}
-
-      # WordPress credentials
-      WP_LOGIN_URL: ${WP_LOGIN_URL}
-      WP_USERNAME: ${WP_USERNAME}
-      WP_PASSWORD: ${WP_PASSWORD}
-      TARGET_URL: ${TARGET_URL}
-
-      # Browser settings
       HEADLESS: "true"
-      TIMEOUT: ${TIMEOUT:-30000}
       CLOSE_BROWSER: "true"
-
-      # Job queue
-      MAX_QUEUE_SIZE: ${MAX_QUEUE_SIZE:-5}
-      JOB_TIMEOUT_MS: ${JOB_TIMEOUT_MS:-300000}
-      JOB_CLEANUP_INTERVAL_MS: ${JOB_CLEANUP_INTERVAL_MS:-3600000}
-
-      # Rate limiting
-      RATE_LIMIT_WINDOW_MS: ${RATE_LIMIT_WINDOW_MS:-60000}
-      RATE_LIMIT_MAX_REQUESTS: ${RATE_LIMIT_MAX_REQUESTS:-10}
-
-      # CORS
-      CORS_ORIGIN: ${CORS_ORIGIN:-*}
-
-      # Logging
-      LOG_LEVEL: ${LOG_LEVEL:-info}
-
-      # Telegram Bot Configuration
-      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
-      TELEGRAM_ALLOWED_USER_IDS: ${TELEGRAM_ALLOWED_USER_IDS}
-
-      # Monday.com Configuration
-      MONDAY_COM_API_KEY: ${MONDAY_COM_API_KEY}
-      MONDAY_COM_BOARD_ID: ${MONDAY_COM_BOARD_ID}
-      MONDAY_COM_API_URL: ${MONDAY_COM_API_URL}
-      MONDAY_COM_TIMEOUT: ${MONDAY_COM_TIMEOUT}
-      MONDAY_COM_EVENT_ID_COLUMN: ${MONDAY_COM_EVENT_ID_COLUMN}
-      MONDAY_COM_CAPACITY_COLUMN: ${MONDAY_COM_CAPACITY_COLUMN}
-      MONDAY_COM_TICKETS_SOLD_COLUMN: ${MONDAY_COM_TICKETS_SOLD_COLUMN}
-      MONDAY_COM_UPDATE_DATE_COLUMN: ${MONDAY_COM_UPDATE_DATE_COLUMN}
 
     volumes:
       # Persistent storage for parsed data, logs, and bot data
