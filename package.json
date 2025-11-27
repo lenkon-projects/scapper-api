@@ -9,13 +9,13 @@
     "start:all:prod": "node dist/start.js",
     "api:dev": "tsx --watch src/api/server.ts",
     "api:prod": "node dist/api/server.js",
-    "sync:monday:dev": "tsx --watch src/scripts/sync_monday.ts",
-    "sync:monday:prod": "node dist/scripts/sync_monday.js",
-    "parse:sync:dev": "tsx --watch src/scripts/parse_and_sync.ts",
-    "parse:sync:prod": "node dist/scripts/parse_and_sync.js",
+    "ozen:sync:dev": "tsx --watch src/scripts/ozen_parse_and_sync.ts",
+    "ozen:sync:prod": "node dist/scripts/ozen_parse_and_sync.js",
     "test:monday": "tsx src/scripts/test_monday_items.ts",
     "bot:dev": "tsx --watch src/bot/telegram-bot.ts",
-    "bot:prod": "node dist/bot/telegram-bot.js"
+    "bot:prod": "node dist/bot/telegram-bot.js",
+    "eventim:sync:dev": "tsx src/scripts/eventim_parse_and_sync.ts",
+    "eventim:sync:prod": "node dist/scripts/eventim_parse_and_sync.js"
   },
   "keywords": [
     "puppeteer",
