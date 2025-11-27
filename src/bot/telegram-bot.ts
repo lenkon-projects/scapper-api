@@ -37,8 +37,26 @@ export class TelegramBotService {
     this.chatIdTracker = ChatIdTrackerService.getInstance();
     this.bot = new TelegramBot(token, { polling: true });
 
+    this.setupBotMenu();
     this.setupCommands();
     this.setupMessageHandler();
+  }
+
+  private async setupBotMenu(): Promise<void> {
+    try {
+      // Set bot commands for quick menu
+      await this.bot.setMyCommands([
+        { command: "start", description: "🚀 Начать работу с ботом" },
+        { command: "help", description: "📖 Список команд" },
+        { command: "parseandsync", description: "🔄 Парсинг и синхронизация" },
+        { command: "events", description: "📅 Список событий" },
+        { command: "status", description: "✅ Статус бота" },
+        { command: "myid", description: "🆔 Узнать свой ID" },
+      ]);
+      console.log("✅ Bot menu commands set successfully");
+    } catch (error) {
+      console.error("❌ Failed to set bot menu commands:", error);
+    }
   }
 
   private isUserAllowed(userId: number): boolean {
