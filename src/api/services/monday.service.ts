@@ -8,6 +8,8 @@ import {
   SyncDetail,
   SyncResult,
   MondayConfig,
+  BoardItemsResponse,
+  MondayItemWithColumns,
 } from "../types/monday.types";
 import { MondayApiError } from "../types/errors";
 
@@ -202,6 +204,70 @@ class MondayService {
         const message = error.response?.data?.error_message || error.message;
         throw new MondayApiError(
           `Failed to update item: ${message}`,
+          statusCode
+        );
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * Get all items from Monday.com board
+   * @param limit - Maximum number of items to retrieve (default: 100)
+   * @returns Array of items with their column values
+   */
+  public async getAllItems(limit: number = 100): Promise<MondayItemWithColumns[]> {
+    const query = `
+      query GetBoardItems($boardId: ID!, $limit: Int!) {
+        boards(ids: [$boardId]) {
+          items_page(limit: $limit) {
+            cursor
+            items {
+              id
+              name
+              column_values {
+                id
+                text
+                value
+              }
+            }
+          }
+        }
+      }
+    `;
+
+    const variables = {
+      boardId: this.config.boardId,
+      limit,
+    };
+
+    try {
+      const response = await this.client.post<
+        MondayApiResponse<BoardItemsResponse>
+      >("", {
+        query,
+        variables,
+      });
+
+      if (response.data.errors && response.data.errors.length > 0) {
+        const errorMessages = response.data.errors
+          .map((e) => e.message)
+          .join(", ");
+        throw new MondayApiError(`Monday.com API error: ${errorMessages}`);
+      }
+
+      const boards = response.data.data.boards;
+      if (boards.length === 0 || !boards[0].items_page.items) {
+        return [];
+      }
+
+      return boards[0].items_page.items;
+    } catch (error) {
+      if (axios.isAxiosError(error)) {
+        const statusCode = error.response?.status || 500;
+        const message = error.response?.data?.error_message || error.message;
+        throw new MondayApiError(
+          `Failed to get items: ${message}`,
           statusCode
         );
       }

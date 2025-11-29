@@ -31,4 +31,5 @@ export interface EventimParseResult {
   outputFile: string;
   screenshotPath: string;
   timestamp: string;
+  printTime?: string; // Print time from the HTML report
 }

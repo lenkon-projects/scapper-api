@@ -9,11 +9,32 @@ export interface MondayItem {
     name: string;
 }
 
+export interface MondayColumnValue {
+    id: string;
+    text?: string;
+    value?: string;
+}
+
+export interface MondayItemWithColumns {
+    id: string;
+    name: string;
+    column_values: MondayColumnValue[];
+}
+
 export interface ItemsSearchResponse {
     items_page_by_column_values: {
         cursor?: string;
         items: MondayItem[];
     };
+}
+
+export interface BoardItemsResponse {
+    boards: Array<{
+        items_page: {
+            cursor?: string;
+            items: MondayItemWithColumns[];
+        };
+    }>;
 }
 
 export interface ChangeMultipleColumnValuesResponse {

@@ -10,6 +10,7 @@ import {
   EventimEvent,
 } from "./eventim.types";
 import { delay } from "./utils";
+import { JSDOM } from "jsdom";
 
 puppeteer.use(StealthPlugin());
 
@@ -767,6 +768,314 @@ export class EventimScraper {
     });
 
     return events;
+  }
+
+  /**
+   * Static method: Parse Eventim HTML report from URL
+   * This is used for static HTML reports that don't require authentication
+   */
+  static async parseFromUrl(url: string): Promise<EventimParseResult> {
+    console.log(`📄 Fetching HTML report from: ${url}`);
+
+    // Fetch HTML content
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error(`Failed to fetch HTML: ${response.status} ${response.statusText}`);
+    }
+    const html = await response.text();
+
+    console.log("✅ HTML fetched successfully");
+
+    // Parse with JSDOM
+    const dom = new JSDOM(html);
+    const document = dom.window.document;
+
+    // Extract print time from the HTML
+    let printTime: string | undefined;
+    const bodyText = document.body.textContent || "";
+    const printTimeMatch = bodyText.match(/Print time:\s*(.+?)(?:\n|$)/i);
+    if (printTimeMatch) {
+      printTime = printTimeMatch[1].trim();
+      console.log(`📅 Report print time: ${printTime}`);
+    }
+
+    // Parse the table using the same logic as parseTable
+    const events: EventimEvent[] = [];
+    const allRows = document.querySelectorAll("table tr");
+
+    let currentVenue = "";
+    const seenEventIds = new Set<string>();
+
+    allRows.forEach((row: Element) => {
+      const rowText = row.textContent || "";
+      const cells = row.querySelectorAll("td");
+
+      if (cells.length === 0) return;
+
+      // Check if this is a venue row
+      if (
+        cells.length === 1 ||
+        (cells.length > 0 && !rowText.includes("UTC"))
+      ) {
+        const firstCellText = cells[0]?.textContent?.trim() || "";
+        const venueMatch = firstCellText.match(/^(\d+)\s*-\s*(.+)$/);
+        if (venueMatch && !firstCellText.includes("UTC")) {
+          currentVenue = venueMatch[2].trim();
+        }
+      }
+
+      // Check if this is an event row
+      if (rowText.includes("(UTC") && cells.length > 5) {
+        let eventId = "";
+        let title = "";
+        let dateStr = "";
+
+        for (let i = 0; i < cells.length; i++) {
+          const cellText = cells[i]?.textContent?.trim() || "";
+
+          const eventMatch = cellText.match(/^(\d+)\s*-\s*(.+)/);
+          if (eventMatch && cellText.includes("UTC")) {
+            eventId = eventMatch[1];
+
+            const rest = eventMatch[2];
+            const utcIndex = rest.indexOf("(UTC");
+            const closeParen = rest.indexOf(")", utcIndex);
+
+            if (utcIndex > 0) {
+              const datePatterns = [
+                /יום\s+(ראשון|שני|שלישי|רביעי|חמישי|שישי)/,
+                /שבת\s+\d/,
+                /\d{2}\s+(ינואר|פברואר|מרץ|אפריל|מאי|יוני|יולי|אוגוסט|ספטמבר|אוקטובר|נובמבר|דצמבר)/,
+              ];
+
+              let dateStartIndex = rest.length;
+              for (const pattern of datePatterns) {
+                const match = rest.match(pattern);
+                if (
+                  match &&
+                  match.index !== undefined &&
+                  match.index < dateStartIndex
+                ) {
+                  dateStartIndex = match.index;
+                }
+              }
+
+              title = rest.substring(0, dateStartIndex).trim();
+              dateStr = rest.substring(dateStartIndex, closeParen + 1).trim();
+            }
+            break;
+          }
+        }
+
+        if (!eventId) return;
+        if (seenEventIds.has(eventId)) return;
+        if (!currentVenue) return;
+
+        // Extract numbers from cells
+        const numbers: number[] = [];
+        cells.forEach((cell: Element) => {
+          const cellText = cell.textContent?.trim() || "";
+          if (/[a-zA-Z\u0590-\u05FF]/.test(cellText) && cellText.length > 5)
+            return;
+
+          const cleaned = cellText.replace(/,/g, "").trim();
+          const num = parseFloat(cleaned);
+          if (!isNaN(num)) {
+            numbers.push(num);
+          }
+        });
+
+        let capacity = 0;
+        let available = 0;
+
+        if (numbers.length >= 2) {
+          capacity = numbers[1] || 0;
+          available = numbers[numbers.length - 1] || 0;
+        }
+
+        const sold = capacity - available;
+        seenEventIds.add(eventId);
+
+        events.push({
+          eventId,
+          title,
+          venue: currentVenue,
+          date: dateStr,
+          ticketsSold: {
+            total: sold > 0 ? sold : 0,
+            capacity,
+          },
+        });
+      }
+    });
+
+    console.log(`✅ Parsed ${events.length} events from HTML`);
+    events.forEach((e) => {
+      console.log(
+        `  📌 ${e.eventId}: ${e.ticketsSold.total}/${e.ticketsSold.capacity} sold`
+      );
+    });
+
+    // Save results
+    const outputDir = "./output";
+    if (!fs.existsSync(outputDir)) {
+      fs.mkdirSync(outputDir, { recursive: true });
+    }
+
+    const timestamp = Date.now();
+    const outputFile = path.join(outputDir, `eventim_static_${timestamp}.json`);
+
+    fs.writeFileSync(outputFile, JSON.stringify(events, null, 2));
+    console.log(`💾 Data saved to: ${outputFile}`);
+
+    return {
+      events,
+      outputFile,
+      screenshotPath: "", // No screenshot for static HTML
+      timestamp: new Date().toISOString(),
+      printTime,
+    };
+  }
+
+  /**
+   * Check if we should parse this report based on print time
+   * Returns null if report is too old, or the last print time if we should parse
+   */
+  private static checkReportFreshness(printTime?: string): { shouldParse: boolean; reason?: string } {
+    if (!printTime) {
+      return { shouldParse: true, reason: "No print time found in report" };
+    }
+
+    const metadataFile = "./output/eventim_metadata.json";
+
+    // Load existing metadata
+    let metadata: { lastPrintTime?: string; lastProcessedAt?: string } = {};
+    if (fs.existsSync(metadataFile)) {
+      try {
+        const content = fs.readFileSync(metadataFile, "utf-8");
+        metadata = JSON.parse(content);
+      } catch (error) {
+        console.log("⚠️ Could not read metadata file, treating as fresh");
+      }
+    }
+
+    // If no previous print time, this is the first run
+    if (!metadata.lastPrintTime) {
+      return { shouldParse: true, reason: "First report" };
+    }
+
+    // Compare print times (as strings, they should be comparable if in consistent format)
+    // Format: "שבת 29 נובמבר 2025 20:20 (UTC+02:00)"
+    if (printTime <= metadata.lastPrintTime) {
+      return {
+        shouldParse: false,
+        reason: `Report is not newer. Current: ${printTime}, Last: ${metadata.lastPrintTime}`
+      };
+    }
+
+    return {
+      shouldParse: true,
+      reason: `Report is newer. Current: ${printTime}, Last: ${metadata.lastPrintTime}`
+    };
+  }
+
+  /**
+   * Save metadata about the processed report
+   */
+  private static saveReportMetadata(printTime?: string): void {
+    if (!printTime) {
+      return;
+    }
+
+    const outputDir = "./output";
+    if (!fs.existsSync(outputDir)) {
+      fs.mkdirSync(outputDir, { recursive: true });
+    }
+
+    const metadataFile = path.join(outputDir, "eventim_metadata.json");
+    const metadata = {
+      lastPrintTime: printTime,
+      lastProcessedAt: new Date().toISOString(),
+    };
+
+    fs.writeFileSync(metadataFile, JSON.stringify(metadata, null, 2));
+    console.log(`💾 Metadata saved: ${printTime}`);
+  }
+
+  /**
+   * Parse from URL with freshness check
+   * Wrapper around parseFromUrl that checks if report should be processed
+   * Returns null if skipped, along with the last print time
+   */
+  static async parseFromUrlWithCheck(url: string): Promise<{
+    result: EventimParseResult | null;
+    skipped: boolean;
+    currentPrintTime?: string;
+    lastPrintTime?: string;
+  }> {
+    console.log(`📄 Fetching HTML report from: ${url}`);
+
+    // Fetch HTML content
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error(`Failed to fetch HTML: ${response.status} ${response.statusText}`);
+    }
+    const html = await response.text();
+
+    console.log("✅ HTML fetched successfully");
+
+    // Parse with JSDOM to extract print time first
+    const dom = new JSDOM(html);
+    const document = dom.window.document;
+
+    // Extract print time
+    let printTime: string | undefined;
+    const bodyText = document.body.textContent || "";
+    const printTimeMatch = bodyText.match(/Print time:\s*(.+?)(?:\n|$)/i);
+    if (printTimeMatch) {
+      printTime = printTimeMatch[1].trim();
+      console.log(`📅 Report print time: ${printTime}`);
+    }
+
+    // Load last print time from metadata
+    const metadataFile = "./output/eventim_metadata.json";
+    let lastPrintTime: string | undefined;
+    if (fs.existsSync(metadataFile)) {
+      try {
+        const content = fs.readFileSync(metadataFile, "utf-8");
+        const metadata = JSON.parse(content);
+        lastPrintTime = metadata.lastPrintTime;
+      } catch (error) {
+        // Ignore error
+      }
+    }
+
+    // Check if we should parse
+    const freshnessCheck = this.checkReportFreshness(printTime);
+    console.log(`🔍 Freshness check: ${freshnessCheck.reason}`);
+
+    if (!freshnessCheck.shouldParse) {
+      console.log("⏭️ Skipping parsing - report is not newer");
+      return {
+        result: null,
+        skipped: true,
+        currentPrintTime: printTime,
+        lastPrintTime,
+      };
+    }
+
+    // Parse the report
+    const result = await this.parseFromUrl(url);
+
+    // Save metadata
+    this.saveReportMetadata(printTime);
+
+    return {
+      result,
+      skipped: false,
+      currentPrintTime: printTime,
+      lastPrintTime,
+    };
   }
 
   /**

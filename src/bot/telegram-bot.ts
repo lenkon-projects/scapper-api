@@ -46,7 +46,6 @@ export class TelegramBotService {
     try {
       // Set bot commands for quick menu
       await this.bot.setMyCommands([
-        { command: "start", description: "🚀 Start working with the bot" },
         { command: "help", description: "📖 Command list" },
         { command: "parseandsync", description: "🔄 Parse and sync" },
         { command: "events", description: "📅 Events list" },
@@ -104,7 +103,7 @@ export class TelegramBotService {
 
       this.bot.sendMessage(
         msg.chat.id,
-        `👋 Hello, ${username}!\n\nWelcome to the events management bot.\n\nAvailable commands:\n/help - Command list\n/parseandsync - Parse and sync\n/status - Bot status\n/myid - Get your ID`
+        `👋 Hello, ${username}!\n\nWelcome to the events management bot.\n\nAvailable commands:\n/help - Command list\n/parseandsync - Parse and sync\n/events - Events list\n/status - Bot status\n/myid - Get your ID`
       );
     });
 
@@ -130,7 +129,7 @@ export class TelegramBotService {
 
       this.bot.sendMessage(
         msg.chat.id,
-        `📖 Available commands:\n\n/start - Start working with the bot\n/help - Show this message\n/status - Check bot status\n/myid - Get your Telegram ID\n/parseandsync - Run parsing and synchronization with Monday.com\n/events - Get events list`
+        `📖 Available commands:\n\n/help - Show this message\n/status - Check bot status\n/myid - Get your Telegram ID\n/parseandsync - Run parsing and synchronization with Monday.com\n/events - Get events list from Monday.com\n\n📎 You can also send Eventim report links:\nSend a link like:\nhttps://webreporting.eventim.de/webreporting/public/Reports/STR_*.html\nto parse and sync Eventim data automatically.`
       );
     });
 
@@ -208,13 +207,11 @@ export class TelegramBotService {
         return;
       }
 
-      // Show source selection menu
+      // Show source selection menu (only Ozen for now)
       const opts: TelegramBot.SendMessageOptions = {
         reply_markup: {
           inline_keyboard: [
             [{ text: "🎭 Ozen", callback_data: "parse_ozen" }],
-            [{ text: "🎫 Eventim", callback_data: "parse_eventim" }],
-            [{ text: "🔄 Both sources", callback_data: "parse_both" }],
           ],
         },
       };
@@ -297,15 +294,79 @@ export class TelegramBotService {
         return;
       }
 
-      this.bot.sendMessage(msg.chat.id, "📋 Getting events list...");
+      await this.bot.sendMessage(msg.chat.id, "📋 Getting events list from Monday.com...");
 
-      // Here you can add logic for getting events
-      // For example, call API endpoint to get events
+      try {
+        const mondayService = MondayService.getInstance();
+        const items = await mondayService.getAllItems(50);
+
+        if (items.length === 0) {
+          await this.bot.sendMessage(msg.chat.id, "⚠️ No events found in Monday.com");
+          return;
+        }
+
+        // Format the events list as a table
+        let message = `📅 *Events in Monday.com* (${items.length} total)\n\n`;
+        message += "```\n";
+        message += "№  | Event Name              | Event ID    | Sold/Cap\n";
+        message += "---|-------------------------|-------------|----------\n";
+
+        items.forEach((item, index) => {
+          // Find Event ID column
+          const eventIdCol = item.column_values.find(col =>
+            col.id === process.env.MONDAY_COM_EVENT_ID_COLUMN || col.id === "text_mkxy6ra8"
+          );
+
+          // Find Tickets Sold column
+          const ticketsSoldCol = item.column_values.find(col =>
+            col.id === process.env.MONDAY_COM_TICKETS_SOLD_COLUMN || col.id === "numeric_mkxsf3c8"
+          );
+
+          // Find Capacity column
+          const capacityCol = item.column_values.find(col =>
+            col.id === process.env.MONDAY_COM_CAPACITY_COLUMN || col.id === "numeric_mkxst6mx"
+          );
+
+          const eventId = eventIdCol?.text || "N/A";
+          const ticketsSold = ticketsSoldCol?.text || "0";
+          const capacity = capacityCol?.text || "0";
+
+          // Truncate name if too long
+          const name = item.name.length > 23 ? item.name.substring(0, 20) + "..." : item.name;
+
+          // Format row with padding
+          const num = String(index + 1).padStart(2, " ");
+          const namePad = name.padEnd(23, " ");
+          const idPad = eventId.padEnd(11, " ");
+          const tickets = `${ticketsSold}/${capacity}`;
+
+          message += `${num} | ${namePad} | ${idPad} | ${tickets}\n`;
+
+          // Telegram has a message length limit, split if needed
+          if (message.length > 3500) {
+            message += "```";
+            this.bot.sendMessage(msg.chat.id, message, { parse_mode: "Markdown" });
+            message = "```\n";
+          }
+        });
+
+        message += "```";
+
+        if (message.length > 0) {
+          await this.bot.sendMessage(msg.chat.id, message, { parse_mode: "Markdown" });
+        }
+      } catch (error) {
+        console.error("Error getting events:", error);
+        await this.bot.sendMessage(
+          msg.chat.id,
+          `❌ Error getting events: ${(error as Error).message}`
+        );
+      }
     });
   }
 
   private setupMessageHandler(): void {
-    this.bot.on("message", (msg) => {
+    this.bot.on("message", async (msg) => {
       const userId = msg.from?.id;
 
       if (!userId) {
@@ -319,6 +380,16 @@ export class TelegramBotService {
         msg.from?.username,
         msg.from?.first_name
       );
+
+      // Check if message contains Eventim report URL
+      const eventimUrlPattern = /https:\/\/webreporting\.eventim\.de\/webreporting\/public\/Reports\/STR_[\w-]+\.html/;
+      const match = msg.text?.match(eventimUrlPattern);
+
+      if (match && this.isUserAllowed(userId)) {
+        const url = match[0];
+        await this.handleEventimStaticReport(msg.chat.id, url);
+        return;
+      }
 
       // If message is not a command and user is not authorized
       if (!msg.text?.startsWith("/") && !this.isUserAllowed(userId)) {
@@ -442,6 +513,98 @@ export class TelegramBotService {
     ].join("\n");
 
     await this.bot.sendMessage(chatId, summary);
+  }
+
+  private async handleEventimStaticReport(
+    chatId: number,
+    url: string
+  ): Promise<void> {
+    await this.bot.sendMessage(
+      chatId,
+      `🎫 [Eventim] Processing static HTML report...\n\n📄 URL: ${url}`
+    );
+
+    try {
+      // Parse the static HTML report with freshness check
+      const checkResult = await EventimScraper.parseFromUrlWithCheck(url);
+
+      // If skipped, the report was too old
+      if (checkResult.skipped) {
+        let skipMessage = `⏭️ [Eventim] Report skipped - not newer than the last processed report.`;
+
+        if (checkResult.currentPrintTime) {
+          skipMessage += `\n\n📄 Current report time: ${checkResult.currentPrintTime}`;
+        }
+
+        if (checkResult.lastPrintTime) {
+          skipMessage += `\n📅 Last processed report: ${checkResult.lastPrintTime}`;
+        }
+
+        skipMessage += `\n\nPlease send a more recent report.`;
+
+        await this.bot.sendMessage(chatId, skipMessage);
+        return;
+      }
+
+      const parseResult = checkResult.result;
+      if (!parseResult) {
+        throw new Error("Unexpected: result is null but not skipped");
+      }
+
+      let statusMessage = `✅ [Eventim] Parsing completed!\n\n📊 Total events: ${parseResult.events.length}\n📁 File: ${parseResult.outputFile}`;
+
+      if (parseResult.printTime) {
+        statusMessage += `\n📅 Report time: ${parseResult.printTime}`;
+      }
+
+      await this.bot.sendMessage(chatId, statusMessage);
+
+      // Convert EventimEvent[] to Event[] (all Eventim events are active)
+      const activeEvents: Event[] = parseResult.events.map((e) => ({
+        active: true,
+        eventId: e.eventId,
+        ticketsSold: {
+          total: e.ticketsSold.total,
+          capacity: e.ticketsSold.capacity,
+        },
+      }));
+
+      if (activeEvents.length === 0) {
+        await this.bot.sendMessage(chatId, "⚠️ [Eventim] No events found");
+        return;
+      }
+
+      await this.bot.sendMessage(
+        chatId,
+        "🔄 [Eventim] Starting sync with Monday.com..."
+      );
+
+      const mondayService = MondayService.getInstance();
+      const syncTimestamp = new Date();
+      const syncResults = await mondayService.syncActiveEvents(
+        activeEvents,
+        syncTimestamp,
+        "ZAP-"
+      );
+
+      const summary = [
+        "✅ [Eventim] Sync completed!\n",
+        `📊 Results:`,
+        `• Processed: ${syncResults.totalProcessed}`,
+        `• Successfully updated: ${syncResults.successfulUpdates}`,
+        `• Skipped: ${syncResults.skipped}`,
+        `• Errors: ${syncResults.errors}`,
+        `\n⏰ Time: ${new Date().toISOString()}`,
+      ].join("\n");
+
+      await this.bot.sendMessage(chatId, summary);
+    } catch (error) {
+      console.error("Error processing Eventim static report:", error);
+      await this.bot.sendMessage(
+        chatId,
+        `❌ [Eventim] Error: ${(error as Error).message}`
+      );
+    }
   }
 
   private sendAccessDeniedMessage(chatId: number, userId?: number): void {
