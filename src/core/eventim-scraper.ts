@@ -938,6 +938,78 @@ export class EventimScraper {
   }
 
   /**
+   * Parse Hebrew date format to Date object
+   * Format: "יום ראשון 30 נובמבר 10:23 2025 (UTC+02:00)" or "שבת 29 נובמבר 20:10 2025 (UTC+02:00)"
+   */
+  private static parseHebrewDate(dateStr: string): Date | null {
+    try {
+      // Hebrew month names to numbers
+      const hebrewMonths: Record<string, number> = {
+        'ינואר': 0,
+        'פברואר': 1,
+        'מרץ': 2,
+        'אפריל': 3,
+        'מאי': 4,
+        'יוני': 5,
+        'יולי': 6,
+        'אוגוסט': 7,
+        'ספטמבר': 8,
+        'אוקטובר': 9,
+        'נובמבר': 10,
+        'דצמבר': 11,
+      };
+
+      // Extract components: day number, month name, time, year, timezone
+      // Pattern: [Day name] [Day number] [Month name] [Time] [Year] (UTC+Timezone)
+      const match = dateStr.match(/(\d+)\s+(\S+)\s+(\d+):(\d+)\s+(\d+)\s+\(UTC([+-]\d+:\d+)\)/);
+
+      if (!match) {
+        console.log(`⚠️ Could not parse date format: ${dateStr}`);
+        return null;
+      }
+
+      const [, day, monthName, hours, minutes, year, timezone] = match;
+      const monthNum = hebrewMonths[monthName];
+
+      if (monthNum === undefined) {
+        console.log(`⚠️ Unknown Hebrew month: ${monthName}`);
+        return null;
+      }
+
+      // Parse timezone offset (e.g., "+02:00" -> 2 hours)
+      const tzMatch = timezone.match(/([+-])(\d+):(\d+)/);
+      if (!tzMatch) {
+        console.log(`⚠️ Could not parse timezone: ${timezone}`);
+        return null;
+      }
+
+      const tzSign = tzMatch[1] === '+' ? 1 : -1;
+      const tzHours = parseInt(tzMatch[2], 10);
+      const tzMinutes = parseInt(tzMatch[3], 10);
+      const tzOffsetMs = tzSign * (tzHours * 60 + tzMinutes) * 60 * 1000;
+
+      // Create date in UTC by adjusting for timezone
+      const localDate = new Date(
+        parseInt(year, 10),
+        monthNum,
+        parseInt(day, 10),
+        parseInt(hours, 10),
+        parseInt(minutes, 10),
+        0,
+        0
+      );
+
+      // Convert to UTC by subtracting the timezone offset
+      const utcDate = new Date(localDate.getTime() - tzOffsetMs);
+
+      return utcDate;
+    } catch (error) {
+      console.log(`⚠️ Error parsing date "${dateStr}":`, error);
+      return null;
+    }
+  }
+
+  /**
    * Check if we should parse this report based on print time
    * Returns null if report is too old, or the last print time if we should parse
    */
@@ -964,18 +1036,36 @@ export class EventimScraper {
       return { shouldParse: true, reason: "First report" };
     }
 
-    // Compare print times (as strings, they should be comparable if in consistent format)
-    // Format: "שבת 29 נובמבר 2025 20:20 (UTC+02:00)"
-    if (printTime <= metadata.lastPrintTime) {
+    // Parse both dates to compare them properly
+    const currentDate = this.parseHebrewDate(printTime);
+    const lastDate = this.parseHebrewDate(metadata.lastPrintTime);
+
+    // If we can't parse dates, fall back to string comparison (better than nothing)
+    if (!currentDate || !lastDate) {
+      console.log("⚠️ Could not parse dates, using string comparison as fallback");
+      if (printTime <= metadata.lastPrintTime) {
+        return {
+          shouldParse: false,
+          reason: `Report is not newer. Current: ${printTime}, Last: ${metadata.lastPrintTime}`
+        };
+      }
+      return {
+        shouldParse: true,
+        reason: `Report is newer. Current: ${printTime}, Last: ${metadata.lastPrintTime}`
+      };
+    }
+
+    // Compare dates properly
+    if (currentDate <= lastDate) {
       return {
         shouldParse: false,
-        reason: `Report is not newer. Current: ${printTime}, Last: ${metadata.lastPrintTime}`
+        reason: `Report is not newer. Current: ${printTime} (${currentDate.toISOString()}), Last: ${metadata.lastPrintTime} (${lastDate.toISOString()})`
       };
     }
 
     return {
       shouldParse: true,
-      reason: `Report is newer. Current: ${printTime}, Last: ${metadata.lastPrintTime}`
+      reason: `Report is newer. Current: ${printTime} (${currentDate.toISOString()}), Last: ${metadata.lastPrintTime} (${lastDate.toISOString()})`
     };
   }
 
