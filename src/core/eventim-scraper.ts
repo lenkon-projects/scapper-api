@@ -959,16 +959,17 @@ export class EventimScraper {
         'דצמבר': 11,
       };
 
-      // Extract components: day number, month name, time, year, timezone
-      // Pattern: [Day name] [Day number] [Month name] [Time] [Year] (UTC+Timezone)
-      const match = dateStr.match(/(\d+)\s+(\S+)\s+(\d+):(\d+)\s+(\d+)\s+\(UTC([+-]\d+:\d+)\)/);
+      // Extract components: day number, month name, year, time, timezone
+      // Pattern: [Day name] [Day number] [Month name] [Year] [Time] (UTC+Timezone)
+      // Example: "יום ראשון 30 נובמבר 2025 10:52 (UTC+02:00)"
+      const match = dateStr.match(/(\d+)\s+(\S+)\s+(\d+)\s+(\d+):(\d+)\s+\(UTC([+-]\d+:\d+)\)/);
 
       if (!match) {
         console.log(`⚠️ Could not parse date format: ${dateStr}`);
         return null;
       }
 
-      const [, day, monthName, hours, minutes, year, timezone] = match;
+      const [, day, monthName, year, hours, minutes, timezone] = match;
       const monthNum = hebrewMonths[monthName];
 
       if (monthNum === undefined) {
