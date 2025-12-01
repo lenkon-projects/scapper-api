@@ -398,6 +398,47 @@ export class TelegramBotService {
     });
   }
 
+  /**
+   * Format sync details to show errors and skipped items
+   */
+  private formatSyncDetails(
+    details: Array<{
+      eventId?: string;
+      status: string;
+      message?: string;
+      mondayItemId?: string;
+    }>
+  ): string | null {
+    const errors = details.filter((d) => d.status === "error");
+    const skipped = details.filter((d) => d.status === "skipped");
+
+    if (errors.length === 0 && skipped.length === 0) {
+      return null;
+    }
+
+    const parts: string[] = [];
+
+    if (errors.length > 0) {
+      parts.push("❌ Errors:");
+      errors.forEach((detail) => {
+        const eventId = detail.eventId || "unknown";
+        const message = detail.message || "Unknown error";
+        parts.push(`  • ${eventId}: ${message}`);
+      });
+    }
+
+    if (skipped.length > 0) {
+      parts.push("\n⚠️ Skipped:");
+      skipped.forEach((detail) => {
+        const eventId = detail.eventId || "unknown";
+        const message = detail.message || "No reason provided";
+        parts.push(`  • ${eventId}: ${message}`);
+      });
+    }
+
+    return parts.join("\n");
+  }
+
   private async executeOzenParseAndSync(chatId: number): Promise<void> {
     await this.bot.sendMessage(
       chatId,
@@ -449,6 +490,12 @@ export class TelegramBotService {
     ].join("\n");
 
     await this.bot.sendMessage(chatId, summary);
+
+    // Send detailed errors and skipped items if any
+    const details = this.formatSyncDetails(syncResults.details);
+    if (details) {
+      await this.bot.sendMessage(chatId, details);
+    }
   }
 
   private async executeEventimParseAndSync(chatId: number): Promise<void> {
@@ -513,6 +560,12 @@ export class TelegramBotService {
     ].join("\n");
 
     await this.bot.sendMessage(chatId, summary);
+
+    // Send detailed errors and skipped items if any
+    const details = this.formatSyncDetails(syncResults.details);
+    if (details) {
+      await this.bot.sendMessage(chatId, details);
+    }
   }
 
   private async handleEventimStaticReport(
@@ -598,6 +651,12 @@ export class TelegramBotService {
       ].join("\n");
 
       await this.bot.sendMessage(chatId, summary);
+
+      // Send detailed errors and skipped items if any
+      const details = this.formatSyncDetails(syncResults.details);
+      if (details) {
+        await this.bot.sendMessage(chatId, details);
+      }
     } catch (error) {
       console.error("Error processing Eventim static report:", error);
       await this.bot.sendMessage(
