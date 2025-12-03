@@ -38,6 +38,9 @@ COPY package*.json ./
 ENV NODE_ENV=production
 RUN npm ci --only=production && npm cache clean --force
 
+# Install Chrome for Puppeteer
+RUN npx puppeteer browsers install chrome
+
 # Copy built application from builder
 COPY --from=builder /app/dist ./dist
 
