@@ -308,8 +308,8 @@ export class TelegramBotService {
         // Format the events list as a table
         let message = `📅 *Events in Monday.com* (${items.length} total)\n\n`;
         message += "```\n";
-        message += "№  | Event Name              | Event ID    | Sold/Cap\n";
-        message += "---|-------------------------|-------------|----------\n";
+        message += "№  | Event Name         | Event ID    | Sold/Cap | Updated\n";
+        message += "---|--------------------|-----------  |----------|-------------\n";
 
         items.forEach((item, index) => {
           // Find Event ID column
@@ -327,20 +327,38 @@ export class TelegramBotService {
             col.id === process.env.MONDAY_COM_CAPACITY_COLUMN || col.id === "numeric_mkxst6mx"
           );
 
+          // Find Update Date column
+          const updateDateCol = item.column_values.find(col =>
+            col.id === process.env.MONDAY_COM_UPDATE_DATE_COLUMN || col.id === "date_mky2adca"
+          );
+
           const eventId = eventIdCol?.text || "N/A";
           const ticketsSold = ticketsSoldCol?.text || "0";
           const capacity = capacityCol?.text || "0";
+          const updateDateRaw = updateDateCol?.text || "N/A";
+
+          // Format date and time as "DD.MM HH:MM"
+          let formattedDateTime = "N/A";
+          if (updateDateRaw !== "N/A" && updateDateRaw.length >= 16) {
+            const dateTime = new Date(updateDateRaw);
+            const day = String(dateTime.getDate()).padStart(2, "0");
+            const month = String(dateTime.getMonth() + 1).padStart(2, "0");
+            const hours = String(dateTime.getHours()).padStart(2, "0");
+            const minutes = String(dateTime.getMinutes()).padStart(2, "0");
+            formattedDateTime = `${day}.${month} ${hours}:${minutes}`;
+          }
 
           // Truncate name if too long
-          const name = item.name.length > 23 ? item.name.substring(0, 20) + "..." : item.name;
+          const name = item.name.length > 18 ? item.name.substring(0, 15) + "..." : item.name;
 
           // Format row with padding
           const num = String(index + 1).padStart(2, " ");
-          const namePad = name.padEnd(23, " ");
+          const namePad = name.padEnd(18, " ");
           const idPad = eventId.padEnd(11, " ");
-          const tickets = `${ticketsSold}/${capacity}`;
+          const tickets = `${ticketsSold}/${capacity}`.padEnd(8, " ");
+          const datePad = formattedDateTime.padEnd(11, " ");
 
-          message += `${num} | ${namePad} | ${idPad} | ${tickets}\n`;
+          message += `${num} | ${namePad} | ${idPad} | ${tickets} | ${datePad}\n`;
 
           // Telegram has a message length limit, split if needed
           if (message.length > 3500) {
