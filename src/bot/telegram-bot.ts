@@ -309,7 +309,7 @@ export class TelegramBotService {
         let message = `📅 *Events in Monday.com* (${items.length} total)\n\n`;
         message += "```\n";
         message += "№  | Event Name         | Event ID    | Sold/Cap | Updated\n";
-        message += "---|--------------------|-----------  |----------|-------------\n";
+        message += "---|--------------------|-----------  |----------|-------------------\n";
 
         items.forEach((item, index) => {
           // Find Event ID column
@@ -335,17 +335,39 @@ export class TelegramBotService {
           const eventId = eventIdCol?.text || "N/A";
           const ticketsSold = ticketsSoldCol?.text || "0";
           const capacity = capacityCol?.text || "0";
-          const updateDateRaw = updateDateCol?.text || "N/A";
 
-          // Format date and time as "DD.MM HH:MM"
+          // Parse Update Date from value JSON (date + time are in UTC)
           let formattedDateTime = "N/A";
-          if (updateDateRaw !== "N/A" && updateDateRaw.length >= 16) {
-            const dateTime = new Date(updateDateRaw);
-            const day = String(dateTime.getDate()).padStart(2, "0");
-            const month = String(dateTime.getMonth() + 1).padStart(2, "0");
-            const hours = String(dateTime.getHours()).padStart(2, "0");
-            const minutes = String(dateTime.getMinutes()).padStart(2, "0");
-            formattedDateTime = `${day}.${month} ${hours}:${minutes}`;
+          if (updateDateCol?.value) {
+            try {
+              const parsed = JSON.parse(updateDateCol.value);
+              if (parsed.date && parsed.time) {
+                // Combine date and time as UTC (add Z suffix)
+                const isoString = `${parsed.date}T${parsed.time}Z`;
+                const dateTime = new Date(isoString);
+
+                // Convert to Jerusalem timezone
+                const formatter = new Intl.DateTimeFormat('en-GB', {
+                  timeZone: 'Asia/Jerusalem',
+                  day: '2-digit',
+                  month: '2-digit',
+                  hour: '2-digit',
+                  minute: '2-digit',
+                  hour12: false
+                });
+
+                const parts = formatter.formatToParts(dateTime);
+                const day = parts.find(p => p.type === 'day')?.value || '00';
+                const month = parts.find(p => p.type === 'month')?.value || '00';
+                const hour = parts.find(p => p.type === 'hour')?.value || '00';
+                const minute = parts.find(p => p.type === 'minute')?.value || '00';
+
+                formattedDateTime = `${day}.${month} ${hour}:${minute} IL`;
+              }
+            } catch (e) {
+              // If parsing fails, fallback to N/A
+              formattedDateTime = "N/A";
+            }
           }
 
           // Truncate name if too long
@@ -356,7 +378,7 @@ export class TelegramBotService {
           const namePad = name.padEnd(18, " ");
           const idPad = eventId.padEnd(11, " ");
           const tickets = `${ticketsSold}/${capacity}`.padEnd(8, " ");
-          const datePad = formattedDateTime.padEnd(11, " ");
+          const datePad = formattedDateTime.padEnd(17, " ");
 
           message += `${num} | ${namePad} | ${idPad} | ${tickets} | ${datePad}\n`;
 

@@ -119,16 +119,57 @@ async function main() {
             const eventIdColumn = item.column_values.find(cv => cv.id === config.eventIdColumn);
             const eventId = eventIdColumn?.text || eventIdColumn?.value || 'N/A';
 
+            // Find Update Date column
+            const updateDateColumn = item.column_values.find(cv => cv.id === 'date_mky2adca');
+
             console.log(
                 item.id.padEnd(15) +
                 eventId.padEnd(20) +
-                item.name
+                item.name.substring(0, 30).padEnd(32) +
+                (updateDateColumn?.text || 'No Update Date')
             );
         }
 
         console.log('─'.repeat(80));
         console.log('');
         console.log(`[TestMondayItems] Total items: ${items.length}`);
+        console.log('');
+
+        // Show detailed column structure for an item with Update Date
+        const itemWithUpdateDate = items.find(item => {
+            const updateDateCol = item.column_values.find(cv => cv.id === 'date_mky2adca');
+            return updateDateCol?.text && updateDateCol.text !== 'N/A';
+        });
+
+        if (itemWithUpdateDate) {
+            console.log('[TestMondayItems] Sample Item with Update Date:');
+            console.log('─'.repeat(80));
+            console.log(`Item: ${itemWithUpdateDate.name} (ID: ${itemWithUpdateDate.id})`);
+            console.log('');
+
+            const updateDateCol = itemWithUpdateDate.column_values.find(cv => cv.id === 'date_mky2adca');
+            if (updateDateCol) {
+                console.log('Update Date Column (date_mky2adca):');
+                console.log(`  Text: ${updateDateCol.text || 'N/A'}`);
+                console.log(`  Value: ${updateDateCol.value || 'N/A'}`);
+                console.log('');
+
+                // Try to parse the value JSON
+                if (updateDateCol.value) {
+                    try {
+                        const parsed = JSON.parse(updateDateCol.value);
+                        console.log('  Parsed Value:');
+                        console.log(`    date: ${parsed.date || 'N/A'}`);
+                        console.log(`    time: ${parsed.time || 'N/A'}`);
+                        console.log(`    changed_at: ${parsed.changed_at || 'N/A'}`);
+                    } catch (e) {
+                        console.log('  Could not parse value as JSON');
+                    }
+                }
+            }
+            console.log('─'.repeat(80));
+            console.log('');
+        }
 
         // Count items with event IDs
         const itemsWithEventIds = items.filter(item => {
