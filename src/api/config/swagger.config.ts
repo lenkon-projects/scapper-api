@@ -69,6 +69,10 @@ const options: swaggerJsdoc.Options = {
                 name: 'Events',
                 description: 'Events data retrieval endpoints',
             },
+            {
+                name: 'Eventim',
+                description: 'Eventim report parsing and Monday.com sync endpoints',
+            },
         ],
     },
     apis: [apiRoutesPath],
