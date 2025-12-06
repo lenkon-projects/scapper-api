@@ -1,6 +1,7 @@
 import * as fs from "fs";
 import * as path from "path";
 import { ChatIdMapping } from "../types/bot.types";
+import { generateUniqueToken } from "../utils/token.utils";
 
 interface StorageFile {
   mappings: ChatIdMapping[];
@@ -35,12 +36,17 @@ export class ChatIdTrackerService {
     username?: string,
     firstName?: string
   ): void {
+    // Получаем существующий маппинг (если есть)
+    const existingMapping = this.cache.get(userId);
+
     const mapping: ChatIdMapping = {
       userId,
       chatId,
       username,
       firstName,
       lastInteraction: new Date().toISOString(),
+      // ВАЖНО: Сохраняем существующий токен если он был
+      token: existingMapping?.token,
     };
 
     this.cache.set(userId, mapping);
@@ -75,6 +81,76 @@ export class ChatIdTrackerService {
     }
 
     return mappings;
+  }
+
+  /**
+   * Получить или сгенерировать токен для пользователя
+   * Если токен уже существует - вернуть существующий
+   * Если нет - сгенерировать новый и сохранить
+   */
+  public getOrCreateToken(userId: number): string | null {
+    const mapping = this.cache.get(userId);
+
+    if (!mapping) {
+      console.warn(`[ChatIdTracker] User ${userId} not found in cache`);
+      return null;
+    }
+
+    // Если токен уже есть - вернуть его
+    if (mapping.token) {
+      return mapping.token;
+    }
+
+    // Получаем все существующие токены для проверки уникальности
+    const existingTokens = Array.from(this.cache.values())
+      .map((m) => m.token)
+      .filter((t): t is string => !!t);
+
+    // Генерируем уникальный токен
+    const newToken = generateUniqueToken(existingTokens);
+
+    // Обновляем mapping
+    mapping.token = newToken;
+    mapping.lastInteraction = new Date().toISOString();
+
+    // Сохраняем в кэш и файл
+    this.cache.set(userId, mapping);
+    this.saveToFile();
+
+    console.log(`[ChatIdTracker] Generated new token for user ${userId}`);
+
+    return newToken;
+  }
+
+  /**
+   * Валидировать токен и вернуть userId
+   * Возвращает userId если токен валиден, null если нет
+   */
+  public validateToken(token: string): number | null {
+    if (!token || typeof token !== "string") {
+      return null;
+    }
+
+    // Ищем пользователя с таким токеном
+    for (const [userId, mapping] of this.cache.entries()) {
+      if (mapping.token === token) {
+        return userId;
+      }
+    }
+
+    return null;
+  }
+
+  /**
+   * Получить маппинг по токену
+   */
+  public getMappingByToken(token: string): ChatIdMapping | null {
+    const userId = this.validateToken(token);
+    if (!userId) {
+      return null;
+    }
+
+    return this.cache.get(userId) || null;
   }
 
   /**

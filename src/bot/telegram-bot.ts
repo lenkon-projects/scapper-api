@@ -163,27 +163,39 @@ export class TelegramBotService {
 
     this.bot.onText(/\/myid/, (msg) => {
       const userId = msg.from?.id;
-      const username = msg.from?.username || msg.from?.first_name || "unknown";
+      const chatId = msg.chat.id;
+      const username = msg.from?.username;
+      const firstName = msg.from?.first_name;
 
       if (!userId) {
         return;
       }
 
       // Track chat ID
-      this.trackUserInteraction(
-        userId,
-        msg.chat.id,
-        msg.from?.username,
-        msg.from?.first_name
-      );
+      this.trackUserInteraction(userId, chatId, username, firstName);
 
       const isAllowed = this.isUserAllowed(userId);
-      this.bot.sendMessage(
-        msg.chat.id,
-        `🆔 Your Telegram ID: ${userId}\n👤 Username: ${username}\n${
-          isAllowed ? "✅ Access granted" : "❌ Access denied"
-        }`
-      );
+
+      // Получить или создать токен
+      const token = this.chatIdTracker.getOrCreateToken(userId);
+
+      // Формировать сообщение
+      let message = `👤 Ваша информация:\n\n`;
+      message += `• Telegram ID: ${userId}\n`;
+
+      if (username) {
+        message += `• Username: @${username}\n`;
+      }
+
+      if (token) {
+        message += `• Токен: \`${token}\`\n`;
+      } else {
+        message += `• Токен: не доступен\n`;
+      }
+
+      message += `• Статус: ${isAllowed ? "✅ Авторизован" : "❌ Не авторизован"}`;
+
+      this.bot.sendMessage(chatId, message, { parse_mode: "Markdown" });
     });
 
     this.bot.onText(/\/parseandsync/, async (msg) => {

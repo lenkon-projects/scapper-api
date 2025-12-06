@@ -21,6 +21,7 @@ export interface ChatIdMapping {
   username?: string;
   firstName?: string;
   lastInteraction: string;
+  token?: string;
 }
 
 export interface NotificationResult {

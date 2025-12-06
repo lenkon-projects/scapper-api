@@ -23,7 +23,7 @@ app.use(helmet({
 app.use(cors({
     origin: process.env.CORS_ORIGIN || '*',
     methods: ['GET', 'POST', 'PUT', 'DELETE'],
-    allowedHeaders: ['Content-Type', 'X-API-Key'],
+    allowedHeaders: ['Content-Type', 'X-API-Key', 'Authorization', 'X-User-Token'],
 }));
 
 app.use(compression());

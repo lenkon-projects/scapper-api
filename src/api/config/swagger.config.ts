@@ -33,13 +33,31 @@ const options: swaggerJsdoc.Options = {
                     type: 'apiKey',
                     in: 'header',
                     name: 'X-API-Key',
-                    description: 'API key for authentication. Can also be passed as query parameter ?apiKey=',
+                    description: 'Global API key for administrative access. Can also be passed as query parameter ?apiKey=',
+                },
+                BearerAuth: {
+                    type: 'http',
+                    scheme: 'bearer',
+                    bearerFormat: 'tk_xxx',
+                    description: 'User token obtained from Telegram bot /myid command. Format: Authorization: Bearer tk_xxx',
+                },
+                UserTokenAuth: {
+                    type: 'apiKey',
+                    in: 'header',
+                    name: 'X-User-Token',
+                    description: 'Alternative header for user token. Format: X-User-Token: tk_xxx',
                 },
             },
         },
         security: [
             {
                 ApiKeyAuth: [],
+            },
+            {
+                BearerAuth: [],
+            },
+            {
+                UserTokenAuth: [],
             },
         ],
         tags: [
