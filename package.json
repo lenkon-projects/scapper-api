@@ -15,7 +15,9 @@
     "bot:dev": "tsx --watch src/bot/telegram-bot.ts",
     "bot:prod": "node dist/bot/telegram-bot.js",
     "eventim:sync:dev": "tsx src/scripts/eventim_parse_and_sync.ts",
-    "eventim:sync:prod": "node dist/scripts/eventim_parse_and_sync.js"
+    "eventim:sync:prod": "node dist/scripts/eventim_parse_and_sync.js",
+    "goshow:sync:dev": "tsx src/scripts/goshow_parse_and_sync.ts",
+    "goshow:sync:prod": "node dist/scripts/goshow_parse_and_sync.js"
   },
   "keywords": [
     "puppeteer",
