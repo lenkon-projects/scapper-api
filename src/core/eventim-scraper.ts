@@ -29,7 +29,8 @@ export class EventimScraper {
   private browser: Browser | null = null;
   private page: Page | null = null;
   private options: EventimParseOptions;
-  private debugDir = "./output/debug";
+  private debugDir: string;
+  private runId: string;
 
   private readonly BASE_URL = "https://webreporting.eventim.de/webreporting/";
   private readonly REPORT_URL =
@@ -41,26 +42,56 @@ export class EventimScraper {
       closeAfter: options.closeAfter ?? process.env.CLOSE_BROWSER !== "false",
     };
 
-    // Clean up before starting
+    // Create unique run ID for this execution
+    this.runId = new Date().toISOString().replace(/[:.]/g, "-").slice(0, -5);
+    this.debugDir = `./output/debug/eventim_${this.runId}`;
+
+    // Clean up old debug folders before starting
     this.cleanupDebugDir();
     this.cleanupOldReports();
 
-    // Ensure debug directory exists
+    // Create debug directory for this run
     if (!fs.existsSync(this.debugDir)) {
       fs.mkdirSync(this.debugDir, { recursive: true });
     }
+
+    console.log(`📁 Debug folder: ${this.debugDir}`);
   }
 
   /**
-   * Clean up debug directory
+   * Clean up all old debug directories from previous runs
    */
   private cleanupDebugDir(): void {
-    if (fs.existsSync(this.debugDir)) {
-      const files = fs.readdirSync(this.debugDir);
-      for (const file of files) {
-        fs.unlinkSync(path.join(this.debugDir, file));
+    const debugBaseDir = "./output/debug";
+    if (!fs.existsSync(debugBaseDir)) return;
+
+    const folders = fs
+      .readdirSync(debugBaseDir)
+      .filter((f) => {
+        const fullPath = path.join(debugBaseDir, f);
+        return (
+          fs.statSync(fullPath).isDirectory() && f.startsWith("eventim_")
+        );
+      });
+
+    let removedCount = 0;
+
+    for (const folder of folders) {
+      const folderPath = path.join(debugBaseDir, folder);
+      try {
+        const files = fs.readdirSync(folderPath);
+        for (const file of files) {
+          fs.unlinkSync(path.join(folderPath, file));
+        }
+        fs.rmdirSync(folderPath);
+        removedCount++;
+      } catch (e) {
+        console.log(`⚠️ Could not remove folder ${folder}`);
       }
-      console.log(`🧹 Cleaned debug directory (${files.length} files removed)`);
+    }
+
+    if (removedCount > 0) {
+      console.log(`🧹 Cleaned ${removedCount} old debug folders`);
     }
   }
 
@@ -114,7 +145,7 @@ export class EventimScraper {
   private async saveDebugScreenshot(step: string): Promise<void> {
     if (!this.page) return;
     try {
-      const filename = `${this.debugDir}/step_${step}_${Date.now()}.png`;
+      const filename = `${this.debugDir}/${step}.png`;
       await this.page.screenshot({ path: filename, fullPage: true });
       console.log(`📸 Debug screenshot: ${filename}`);
     } catch (e) {

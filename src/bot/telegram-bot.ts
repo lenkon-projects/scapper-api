@@ -5,6 +5,7 @@ import { ChatIdTrackerService } from "./services/chat-id-tracker.service";
 import { BotConfig } from "./types/bot.types";
 import { executeParse } from "../core/scraper";
 import { EventimScraper } from "../core/eventim-scraper";
+import { GoShowScraper } from "../core/goshow-scraper";
 import { Event } from "../core/types";
 import MondayService from "../api/services/monday.service";
 
@@ -219,11 +220,12 @@ export class TelegramBotService {
         return;
       }
 
-      // Show source selection menu (only Ozen for now)
+      // Show source selection menu
       const opts: TelegramBot.SendMessageOptions = {
         reply_markup: {
           inline_keyboard: [
             [{ text: "🎭 Ozen", callback_data: "parse_ozen" }],
+            [{ text: "🎪 GoShow", callback_data: "parse_goshow" }],
           ],
         },
       };
@@ -257,6 +259,7 @@ export class TelegramBotService {
       // Update the message to show selected option
       const sourceNames: Record<string, string> = {
         parse_ozen: "🎭 Ozen",
+        parse_goshow: "🎪 GoShow",
         parse_eventim: "🎫 Eventim",
         parse_both: "🔄 Both sources",
       };
@@ -271,6 +274,8 @@ export class TelegramBotService {
       try {
         if (data === "parse_ozen") {
           await this.executeOzenParseAndSync(chatId);
+        } else if (data === "parse_goshow") {
+          await this.executeGoShowParseAndSync(chatId);
         } else if (data === "parse_eventim") {
           await this.executeEventimParseAndSync(chatId);
         } else if (data === "parse_both") {
@@ -533,6 +538,76 @@ export class TelegramBotService {
 
     const summary = [
       "✅ [Ozen] Sync completed!\n",
+      `📊 Results:`,
+      `• Processed: ${syncResults.totalProcessed}`,
+      `• Successfully updated: ${syncResults.successfulUpdates}`,
+      `• Skipped: ${syncResults.skipped}`,
+      `• Errors: ${syncResults.errors}`,
+      `\n⏰ Time: ${new Date().toISOString()}`,
+    ].join("\n");
+
+    await this.bot.sendMessage(chatId, summary);
+
+    // Send detailed errors and skipped items if any
+    const details = this.formatSyncDetails(syncResults.details);
+    if (details) {
+      await this.bot.sendMessage(chatId, details);
+    }
+  }
+
+  private async executeGoShowParseAndSync(chatId: number): Promise<void> {
+    await this.bot.sendMessage(
+      chatId,
+      "🎪 [GoShow] Starting parsing...\n\nThis may take some time."
+    );
+
+    const scraper = new GoShowScraper({
+      headless: true,
+      closeAfter: true,
+    });
+
+    const parseResult = await scraper.execute();
+
+    await this.bot.sendMessage(
+      chatId,
+      `✅ [GoShow] Parsing completed!\n\n📊 Total events: ${parseResult.events.length}\n📁 File: ${parseResult.outputFile}`
+    );
+
+    // Convert GoShowEvent[] to Event[] (all GoShow events are active)
+    const activeEvents: Event[] = parseResult.events.map((e) => ({
+      active: true,
+      eventId: e.eventId,
+      ticketsSold: {
+        total: e.ticketsSold.total,
+        capacity: e.ticketsSold.capacity,
+      },
+    }));
+
+    await this.bot.sendMessage(
+      chatId,
+      `🔍 [GoShow] Active events: ${activeEvents.length}`
+    );
+
+    if (activeEvents.length === 0) {
+      await this.bot.sendMessage(chatId, "⚠️ [GoShow] No events to sync");
+      return;
+    }
+
+    await this.bot.sendMessage(
+      chatId,
+      "🔄 [GoShow] Starting sync with Monday.com..."
+    );
+
+    const mondayService = MondayService.getInstance();
+    const syncTimestamp = new Date();
+    const syncResults = await mondayService.syncActiveEvents(
+      activeEvents,
+      syncTimestamp,
+      "GO-"
+    );
+
+    const summary = [
+      "✅ [GoShow] Sync completed!\n",
       `📊 Results:`,
       `• Processed: ${syncResults.totalProcessed}`,
       `• Successfully updated: ${syncResults.successfulUpdates}`,

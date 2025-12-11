@@ -36,8 +36,8 @@ async function main() {
     console.log("");
 
     const scraper = new GoShowScraper({
-      headless: false,
-      closeAfter: false,
+      headless: true,
+      closeAfter: true,
     });
 
     const parseResult = await scraper.execute();
