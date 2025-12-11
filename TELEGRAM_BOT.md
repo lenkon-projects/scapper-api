@@ -1,86 +1,86 @@
-# Telegram Bot - Инструкция по настройке
+# Telegram Bot - Setup Instructions
 
-## Что это?
+## What is this?
 
-Telegram бот с ограниченным доступом для управления событиями. Бот работает только с пользователями из белого списка.
+Telegram bot with restricted access for event management. The bot only works with whitelisted users.
 
-## Шаг 1: Создание бота в Telegram
+## Step 1: Creating a bot in Telegram
 
-1. Откройте Telegram и найдите [@BotFather](https://t.me/botfather)
-2. Отправьте команду `/newbot`
-3. Введите имя бота (например: "My Events Bot")
-4. Введите username бота (должен заканчиваться на `bot`, например: `my_events_bot`)
-5. **Сохраните токен**, который выдаст BotFather
-   - Токен выглядит так: `1234567890:ABCdefGHIjklMNOpqrsTUVwxyz`
+1. Open Telegram and find [@BotFather](https://t.me/botfather)
+2. Send the command `/newbot`
+3. Enter the bot name (for example: "My Events Bot")
+4. Enter the bot username (must end with `bot`, for example: `my_events_bot`)
+5. **Save the token** that BotFather provides
+   - Token looks like: `1234567890:ABCdefGHIjklMNOpqrsTUVwxyz`
 
-## Шаг 2: Получение вашего Telegram ID
+## Step 2: Getting your Telegram ID
 
-1. Найдите бота [@userinfobot](https://t.me/userinfobot) в Telegram
-2. Отправьте ему любое сообщение
-3. Он пришлет ваш ID (например: `123456789`)
-4. Сохраните этот ID
+1. Find the [@userinfobot](https://t.me/userinfobot) bot in Telegram
+2. Send it any message
+3. It will send you your ID (for example: `123456789`)
+4. Save this ID
 
-## Шаг 3: Настройка .env файла
+## Step 3: Configuring the .env file
 
-Откройте файл `.env` и добавьте/измените следующие строки:
+Open the `.env` file and add/modify the following lines:
 
 ```bash
 # Telegram Bot Configuration
-TELEGRAM_BOT_TOKEN=ваш_токен_от_botfather
-TELEGRAM_ALLOWED_USER_IDS=ваш_telegram_id,id_другого_пользователя
+TELEGRAM_BOT_TOKEN=your_token_from_botfather
+TELEGRAM_ALLOWED_USER_IDS=your_telegram_id,other_user_id
 ```
 
-**Пример:**
+**Example:**
 ```bash
 TELEGRAM_BOT_TOKEN=1234567890:ABCdefGHIjklMNOpqrsTUVwxyz
 TELEGRAM_ALLOWED_USER_IDS=123456789,987654321
 ```
 
-Если нужно добавить больше пользователей, просто добавляйте их ID через запятую.
+If you need to add more users, simply add their IDs separated by commas.
 
-## Шаг 4: Запуск бота
+## Step 4: Starting the bot
 
-### Режим разработки (с автоперезагрузкой):
+### Development mode (with auto-reload):
 ```bash
 npm run bot
 ```
 
-### Продакшн режим:
+### Production mode:
 ```bash
 npm run bot:build
 ```
 
-## Доступные команды бота
+## Available bot commands
 
-После запуска бота, авторизованные пользователи могут использовать следующие команды:
+After starting the bot, authorized users can use the following commands:
 
-- `/start` - Начать работу с ботом
-- `/help` - Показать список доступных команд
-- `/status` - Проверить статус бота
-- `/myid` - Узнать свой Telegram ID
-- `/parse` - Запустить парсинг событий
-- `/events` - Получить список событий
+- `/start` - Start working with the bot
+- `/help` - Show list of available commands
+- `/status` - Check bot status
+- `/myid` - Get your Telegram ID
+- `/parse` - Run event parsing
+- `/events` - Get list of events
 
-## Безопасность
+## Security
 
-- Только пользователи из списка `TELEGRAM_ALLOWED_USER_IDS` могут использовать бота
-- При попытке доступа неавторизованного пользователя, бот покажет сообщение с его ID
-- Вы можете добавить этот ID в `.env` файл, чтобы разрешить доступ
+- Only users from the `TELEGRAM_ALLOWED_USER_IDS` list can use the bot
+- When an unauthorized user tries to access, the bot will show a message with their ID
+- You can add this ID to the `.env` file to grant access
 
-## Структура проекта
+## Project structure
 
 ```
 src/bot/
 ├── types/
-│   └── bot.types.ts          # Типы для TypeScript
+│   └── bot.types.ts          # TypeScript types
 ├── services/
-│   └── auth.service.ts       # Сервис авторизации
-└── telegram-bot.ts            # Основной файл бота
+│   └── auth.service.ts       # Authorization service
+└── telegram-bot.ts            # Main bot file
 ```
 
-## Добавление новых команд
+## Adding new commands
 
-Чтобы добавить новую команду, откройте [src/bot/telegram-bot.ts](src/bot/telegram-bot.ts) и добавьте обработчик в метод `setupCommands()`:
+To add a new command, open [src/bot/telegram-bot.ts](src/bot/telegram-bot.ts) and add a handler in the `setupCommands()` method:
 
 ```typescript
 this.bot.onText(/\/mycommand/, (msg) => {
@@ -90,40 +90,40 @@ this.bot.onText(/\/mycommand/, (msg) => {
     return;
   }
 
-  this.bot.sendMessage(msg.chat.id, 'Ваш ответ здесь');
+  this.bot.sendMessage(msg.chat.id, 'Your response here');
 });
 ```
 
-## Остановка бота
+## Stopping the bot
 
-Для корректной остановки бота используйте:
-- `Ctrl+C` в терминале
-- Бот корректно завершит работу и отключится от Telegram API
+To properly stop the bot use:
+- `Ctrl+C` in the terminal
+- The bot will correctly finish its work and disconnect from the Telegram API
 
 ## Troubleshooting
 
-### Бот не отвечает
-- Проверьте, что токен в `.env` файле правильный
-- Убедитесь, что ваш ID добавлен в `TELEGRAM_ALLOWED_USER_IDS`
+### Bot doesn't respond
+- Check that the token in the `.env` file is correct
+- Make sure your ID is added to `TELEGRAM_ALLOWED_USER_IDS`
 
-### Ошибка "TELEGRAM_BOT_TOKEN не найден"
-- Убедитесь, что вы создали `.env` файл
-- Проверьте, что в `.env` есть строка `TELEGRAM_BOT_TOKEN=...`
+### Error "TELEGRAM_BOT_TOKEN not found"
+- Make sure you created the `.env` file
+- Check that the `.env` has the line `TELEGRAM_BOT_TOKEN=...`
 
-### Бот говорит "Доступ запрещен"
-- Используйте команду `/myid`, чтобы узнать свой ID
-- Добавьте этот ID в `.env` файл в `TELEGRAM_ALLOWED_USER_IDS`
-- Перезапустите бота
+### Bot says "Access denied"
+- Use the `/myid` command to find out your ID
+- Add this ID to the `.env` file in `TELEGRAM_ALLOWED_USER_IDS`
+- Restart the bot
 
-## Интеграция с существующим кодом
+## Integration with existing code
 
-Вы можете интегрировать функции парсинга в команды бота. Например:
+You can integrate parsing functions into bot commands. For example:
 
 ```typescript
-// В методе setupCommands()
+// In the setupCommands() method
 this.bot.onText(/\/parse/, async (msg) => {
-  // Импортировать и вызвать функцию парсинга
+  // Import and call the parsing function
   const { parseEvents } = await import('../parse_events');
-  // Вызвать функцию и отправить результат пользователю
+  // Call the function and send the result to the user
 });
 ```
