@@ -136,7 +136,24 @@ export class TelegramBotService {
 
       this.bot.sendMessage(
         msg.chat.id,
-        `📖 Available commands:\n\n/help - Show this message\n/status - Check bot status\n/myid - Get your Telegram ID\n/parseandsync - Run parsing and synchronization with Monday.com\n/events - Get events list from Monday.com\n\n📎 You can also send Eventim report links:\nSend a link like:\nhttps://webreporting.eventim.de/webreporting/public/Reports/STR_*.html\nto parse and sync Eventim data automatically.`
+        `📖 *Available Commands*\n\n` +
+          `*General:*\n` +
+          `/help - Show this help message\n` +
+          `/status - Check bot status\n` +
+          `/myid - Get your Telegram ID and token\n\n` +
+          `*Event Management:*\n` +
+          `/parseandsync - Parse and sync events with Monday.com\n` +
+          `  • Ozen - Parse Ozen events\n` +
+          `  • GoShow - Parse GoShow events\n` +
+          `  • Zygo - Parse Zygo events\n` +
+          `/events - View events list from Monday.com\n\n` +
+          `*Authorization:*\n` +
+          `/zygo_auth - Authorize Zygo account via SMS code\n\n` +
+          `📎 *Eventim Reports:*\n` +
+          `You can send Eventim report links directly:\n` +
+          `https://webreporting.eventim.de/webreporting/public/Reports/STR_*.html\n` +
+          `The bot will automatically parse and sync the data.`,
+        { parse_mode: "Markdown" }
       );
     });
 
