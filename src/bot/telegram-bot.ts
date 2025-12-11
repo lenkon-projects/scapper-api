@@ -6,8 +6,11 @@ import { BotConfig } from "./types/bot.types";
 import { executeParse } from "../core/scraper";
 import { EventimScraper } from "../core/eventim-scraper";
 import { GoShowScraper } from "../core/goshow-scraper";
+import ZygoScraper from "../core/zygo-scraper";
 import { Event } from "../core/types";
 import MondayService from "../api/services/monday.service";
+import ZygoTokenService from "../services/zygo-token.service";
+import axios from "axios";
 
 dotenv.config();
 
@@ -16,6 +19,8 @@ export class TelegramBotService {
   private authService: AuthService;
   private chatIdTracker: ChatIdTrackerService;
   private config: BotConfig;
+  private awaitingZygoCode: Map<number, boolean> = new Map();
+  private zygoVerifyTokens: Map<number, string> = new Map();
 
   constructor() {
     const token = process.env.TELEGRAM_BOT_TOKEN;
@@ -52,6 +57,7 @@ export class TelegramBotService {
         { command: "events", description: "📅 Events list" },
         { command: "status", description: "✅ Bot status" },
         { command: "myid", description: "🆔 Get your ID" },
+        { command: "zygo_auth", description: "🏆 Zygo authorization" },
       ]);
       console.log("✅ Bot menu commands set successfully");
     } catch (error) {
@@ -194,7 +200,9 @@ export class TelegramBotService {
         message += `• Токен: не доступен\n`;
       }
 
-      message += `• Статус: ${isAllowed ? "✅ Авторизован" : "❌ Не авторизован"}`;
+      message += `• Статус: ${
+        isAllowed ? "✅ Авторизован" : "❌ Не авторизован"
+      }`;
 
       this.bot.sendMessage(chatId, message, { parse_mode: "Markdown" });
     });
@@ -226,11 +234,79 @@ export class TelegramBotService {
           inline_keyboard: [
             [{ text: "🎭 Ozen", callback_data: "parse_ozen" }],
             [{ text: "🎪 GoShow", callback_data: "parse_goshow" }],
+            [{ text: "🏆 Zygo", callback_data: "parse_zygo" }],
           ],
         },
       };
 
       await this.bot.sendMessage(chatId, "📋 Select parsing source:", opts);
+    });
+
+    // Zygo Auth command
+    this.bot.onText(/\/zygo_auth/, async (msg) => {
+      const userId = msg.from?.id;
+      const chatId = msg.chat.id;
+
+      if (!userId) {
+        return;
+      }
+
+      // Track chat ID
+      this.trackUserInteraction(
+        userId,
+        chatId,
+        msg.from?.username,
+        msg.from?.first_name
+      );
+
+      try {
+        const phone = process.env.ZYGO_USERPHONE;
+        if (!phone) {
+          await this.bot.sendMessage(
+            chatId,
+            "❌ ZYGO_USERPHONE не установлен в .env файле"
+          );
+          return;
+        }
+
+        await this.bot.sendMessage(chatId, "🔄 Отправляем код на телефон...");
+
+        // Отправка кода через API Zygo v2
+        const response = await axios.post(
+          "https://api.zygo.co.il/v2/auth/create-verify-token",
+          { phone },
+          {
+            headers: {
+              "Content-Type": "application/json",
+              Accept: "application/json",
+              Origin: "https://zygo.co.il",
+              Referer: "https://zygo.co.il/",
+            },
+          }
+        );
+
+        // Сохранить verify token
+        if (response.data?.token) {
+          this.zygoVerifyTokens.set(userId, response.data.token);
+        }
+
+        // Установить флаг ожидания кода
+        this.awaitingZygoCode.set(userId, true);
+
+        await this.bot.sendMessage(
+          chatId,
+          `📱 Код отправлен на телефон ${phone}\n\n` +
+            `Введите 6-значный код из SMS:`
+        );
+      } catch (error: any) {
+        console.error("Error sending Zygo auth code:", error);
+        await this.bot.sendMessage(
+          chatId,
+          `❌ Ошибка отправки кода: ${
+            error.response?.data?.message || error.message
+          }`
+        );
+      }
     });
 
     // Handle callback queries for parse source selection
@@ -261,6 +337,7 @@ export class TelegramBotService {
         parse_ozen: "🎭 Ozen",
         parse_goshow: "🎪 GoShow",
         parse_eventim: "🎫 Eventim",
+        parse_zygo: "🏆 Zygo",
         parse_both: "🔄 Both sources",
       };
 
@@ -278,6 +355,8 @@ export class TelegramBotService {
           await this.executeGoShowParseAndSync(chatId);
         } else if (data === "parse_eventim") {
           await this.executeEventimParseAndSync(chatId);
+        } else if (data === "parse_zygo") {
+          await this.executeZygoParseAndSync(chatId);
         } else if (data === "parse_both") {
           await this.executeOzenParseAndSync(chatId);
           await this.executeEventimParseAndSync(chatId);
@@ -311,42 +390,58 @@ export class TelegramBotService {
         return;
       }
 
-      await this.bot.sendMessage(msg.chat.id, "📋 Getting events list from Monday.com...");
+      await this.bot.sendMessage(
+        msg.chat.id,
+        "📋 Getting events list from Monday.com..."
+      );
 
       try {
         const mondayService = MondayService.getInstance();
         const items = await mondayService.getAllItems(50);
 
         if (items.length === 0) {
-          await this.bot.sendMessage(msg.chat.id, "⚠️ No events found in Monday.com");
+          await this.bot.sendMessage(
+            msg.chat.id,
+            "⚠️ No events found in Monday.com"
+          );
           return;
         }
 
         // Format the events list as a table
         let message = `📅 *Events in Monday.com* (${items.length} total)\n\n`;
         message += "```\n";
-        message += "№  | Event Name         | Event ID    | Sold/Cap | Updated\n";
-        message += "---|--------------------|-----------  |----------|-------------------\n";
+        message +=
+          "№  | Event Name         | Event ID    | Sold/Cap | Updated\n";
+        message +=
+          "---|--------------------|-----------  |----------|-------------------\n";
 
         items.forEach((item, index) => {
           // Find Event ID column
-          const eventIdCol = item.column_values.find(col =>
-            col.id === process.env.MONDAY_COM_EVENT_ID_COLUMN || col.id === "text_mkxy6ra8"
+          const eventIdCol = item.column_values.find(
+            (col) =>
+              col.id === process.env.MONDAY_COM_EVENT_ID_COLUMN ||
+              col.id === "text_mkxy6ra8"
           );
 
           // Find Tickets Sold column
-          const ticketsSoldCol = item.column_values.find(col =>
-            col.id === process.env.MONDAY_COM_TICKETS_SOLD_COLUMN || col.id === "numeric_mkxsf3c8"
+          const ticketsSoldCol = item.column_values.find(
+            (col) =>
+              col.id === process.env.MONDAY_COM_TICKETS_SOLD_COLUMN ||
+              col.id === "numeric_mkxsf3c8"
           );
 
           // Find Capacity column
-          const capacityCol = item.column_values.find(col =>
-            col.id === process.env.MONDAY_COM_CAPACITY_COLUMN || col.id === "numeric_mkxst6mx"
+          const capacityCol = item.column_values.find(
+            (col) =>
+              col.id === process.env.MONDAY_COM_CAPACITY_COLUMN ||
+              col.id === "numeric_mkxst6mx"
           );
 
           // Find Update Date column
-          const updateDateCol = item.column_values.find(col =>
-            col.id === process.env.MONDAY_COM_UPDATE_DATE_COLUMN || col.id === "date_mky2adca"
+          const updateDateCol = item.column_values.find(
+            (col) =>
+              col.id === process.env.MONDAY_COM_UPDATE_DATE_COLUMN ||
+              col.id === "date_mky2adca"
           );
 
           const eventId = eventIdCol?.text || "N/A";
@@ -364,20 +459,23 @@ export class TelegramBotService {
                 const dateTime = new Date(isoString);
 
                 // Convert to Jerusalem timezone
-                const formatter = new Intl.DateTimeFormat('en-GB', {
-                  timeZone: 'Asia/Jerusalem',
-                  day: '2-digit',
-                  month: '2-digit',
-                  hour: '2-digit',
-                  minute: '2-digit',
-                  hour12: false
+                const formatter = new Intl.DateTimeFormat("en-GB", {
+                  timeZone: "Asia/Jerusalem",
+                  day: "2-digit",
+                  month: "2-digit",
+                  hour: "2-digit",
+                  minute: "2-digit",
+                  hour12: false,
                 });
 
                 const parts = formatter.formatToParts(dateTime);
-                const day = parts.find(p => p.type === 'day')?.value || '00';
-                const month = parts.find(p => p.type === 'month')?.value || '00';
-                const hour = parts.find(p => p.type === 'hour')?.value || '00';
-                const minute = parts.find(p => p.type === 'minute')?.value || '00';
+                const day = parts.find((p) => p.type === "day")?.value || "00";
+                const month =
+                  parts.find((p) => p.type === "month")?.value || "00";
+                const hour =
+                  parts.find((p) => p.type === "hour")?.value || "00";
+                const minute =
+                  parts.find((p) => p.type === "minute")?.value || "00";
 
                 formattedDateTime = `${day}.${month} ${hour}:${minute} IL`;
               }
@@ -388,7 +486,10 @@ export class TelegramBotService {
           }
 
           // Truncate name if too long
-          const name = item.name.length > 18 ? item.name.substring(0, 15) + "..." : item.name;
+          const name =
+            item.name.length > 18
+              ? item.name.substring(0, 15) + "..."
+              : item.name;
 
           // Format row with padding
           const num = String(index + 1).padStart(2, " ");
@@ -402,7 +503,9 @@ export class TelegramBotService {
           // Telegram has a message length limit, split if needed
           if (message.length > 3500) {
             message += "```";
-            this.bot.sendMessage(msg.chat.id, message, { parse_mode: "Markdown" });
+            this.bot.sendMessage(msg.chat.id, message, {
+              parse_mode: "Markdown",
+            });
             message = "```\n";
           }
         });
@@ -410,7 +513,9 @@ export class TelegramBotService {
         message += "```";
 
         if (message.length > 0) {
-          await this.bot.sendMessage(msg.chat.id, message, { parse_mode: "Markdown" });
+          await this.bot.sendMessage(msg.chat.id, message, {
+            parse_mode: "Markdown",
+          });
         }
       } catch (error) {
         console.error("Error getting events:", error);
@@ -438,8 +543,19 @@ export class TelegramBotService {
         msg.from?.first_name
       );
 
+      // Check if waiting for Zygo code
+      if (
+        this.awaitingZygoCode.get(userId) &&
+        msg.text &&
+        !msg.text.startsWith("/")
+      ) {
+        await this.handleZygoCodeInput(userId, msg.chat.id, msg.text);
+        return;
+      }
+
       // Check if message contains Eventim report URL
-      const eventimUrlPattern = /https:\/\/webreporting\.eventim\.de\/webreporting\/public\/Reports\/STR_[\w-]+\.html/;
+      const eventimUrlPattern =
+        /https:\/\/webreporting\.eventim\.de\/webreporting\/public\/Reports\/STR_[\w-]+\.html/;
       const match = msg.text?.match(eventimUrlPattern);
 
       if (match && this.isUserAllowed(userId)) {
@@ -453,6 +569,106 @@ export class TelegramBotService {
         this.sendAccessDeniedMessage(msg.chat.id, userId);
       }
     });
+  }
+
+  /**
+   * Обработка ввода кода Zygo от пользователя
+   */
+  private async handleZygoCodeInput(
+    userId: number,
+    chatId: number,
+    code: string
+  ): Promise<void> {
+    // Проверить формат кода (6 цифр)
+    if (!/^\d{6}$/.test(code)) {
+      await this.bot.sendMessage(
+        chatId,
+        "❌ Неверный формат кода. Введите 6-значный код из SMS:"
+      );
+      return;
+    }
+
+    try {
+      await this.bot.sendMessage(chatId, "🔄 Проверяем код...");
+
+      const phone = process.env.ZYGO_USERPHONE;
+      if (!phone) {
+        throw new Error("ZYGO_USERPHONE не установлен");
+      }
+
+      // Получить verify token
+      const verifyToken = this.zygoVerifyTokens.get(userId);
+      if (!verifyToken) {
+        throw new Error("Verify token не найден. Попробуйте /zygo_auth снова.");
+      }
+
+      // Верификация кода через API Zygo v2
+      const response = await axios.post<any>(
+        "https://api.zygo.co.il/v2/auth/verify-phone-code-register-check-if-user",
+        {
+          phone,
+          code,
+          token: verifyToken,
+        },
+        {
+          headers: {
+            "Content-Type": "application/json",
+            Accept: "application/json",
+            Origin: "https://zygo.co.il",
+            Referer: "https://zygo.co.il/",
+          },
+        }
+      );
+
+      // Проверить что пользователь существует и есть токены
+      if (!response.data.ok || !response.data.exists || !response.data.tokens) {
+        throw new Error(
+          "Пользователь не найден или не авторизован. Зарегистрируйтесь на zygo.co.il сначала."
+        );
+      }
+
+      // Сохранить токены через ZygoTokenService
+      const tokenService = ZygoTokenService.getInstance();
+      tokenService.setTokens({
+        user: response.data.user,
+        tokens: {
+          access: {
+            token: response.data.tokens.access.token,
+            expires: response.data.tokens.access.expires,
+          },
+          refresh: {
+            token: response.data.tokens.refresh.token,
+            expires: response.data.tokens.refresh.expires,
+          },
+        },
+      });
+
+      // Убрать флаги ожидания
+      this.awaitingZygoCode.delete(userId);
+      this.zygoVerifyTokens.delete(userId);
+
+      await this.bot.sendMessage(
+        chatId,
+        `✅ Авторизация успешна!\n\n` +
+          `Пользователь: ${response.data.user.firstName || ""} ${
+            response.data.user.lastName || ""
+          }\n` +
+          `Токен сохранён и будет обновляться автоматически.`
+      );
+    } catch (error: any) {
+      console.error("Error verifying Zygo code:", error);
+
+      // Убрать флаги ожидания при ошибке
+      this.awaitingZygoCode.delete(userId);
+      this.zygoVerifyTokens.delete(userId);
+
+      await this.bot.sendMessage(
+        chatId,
+        `❌ Ошибка верификации кода: ${
+          error.response?.data?.message || error.message
+        }\n\n` + `Попробуйте снова с помощью /zygo_auth`
+      );
+    }
   }
 
   /**
@@ -622,6 +838,89 @@ export class TelegramBotService {
     const details = this.formatSyncDetails(syncResults.details);
     if (details) {
       await this.bot.sendMessage(chatId, details);
+    }
+  }
+
+  private async executeZygoParseAndSync(chatId: number): Promise<void> {
+    await this.bot.sendMessage(
+      chatId,
+      "🏆 [Zygo] Starting parsing...\n\nThis may take some time."
+    );
+
+    try {
+      const scraper = new ZygoScraper();
+      const events = await scraper.getManagedEvents(false); // past=false для будущих событий
+
+      await this.bot.sendMessage(
+        chatId,
+        `✅ [Zygo] Parsing completed!\n\n📊 Total managed events: ${events.length}`
+      );
+
+      if (events.length === 0) {
+        await this.bot.sendMessage(chatId, "⚠️ [Zygo] No managed events found");
+        return;
+      }
+
+      // Фильтровать только будущие события
+      const now = new Date();
+      const upcomingEvents = events.filter((e) => new Date(e.startDate) > now);
+
+      // Преобразовать в формат Event для Monday.com
+      const activeEvents: Event[] = upcomingEvents.map((e) => ({
+        active: true,
+        eventId: e.identifier,
+        ticketsSold: {
+          total: e.analytics?.approved || 0, // Используем реальное количество проданных билетов
+          // capacity НЕ передаётся - заполняется в Monday.com вручную
+        },
+      }));
+
+      await this.bot.sendMessage(
+        chatId,
+        `🔍 [Zygo] Upcoming events: ${activeEvents.length} of ${events.length}`
+      );
+
+      if (activeEvents.length === 0) {
+        await this.bot.sendMessage(
+          chatId,
+          "⚠️ [Zygo] No upcoming events to sync"
+        );
+        return;
+      }
+
+      await this.bot.sendMessage(
+        chatId,
+        "🔄 [Zygo] Starting sync with Monday.com..."
+      );
+
+      const mondayService = MondayService.getInstance();
+      const syncTimestamp = new Date();
+      const syncResults = await mondayService.syncActiveEvents(
+        activeEvents,
+        syncTimestamp,
+        "ZY-"
+      );
+
+      const summary = [
+        "✅ [Zygo] Sync completed!\n",
+        `📊 Results:`,
+        `• Processed: ${syncResults.totalProcessed}`,
+        `• Successfully updated: ${syncResults.successfulUpdates}`,
+        `• Skipped: ${syncResults.skipped}`,
+        `• Errors: ${syncResults.errors}`,
+        `\n⏰ Time: ${new Date().toISOString()}`,
+      ].join("\n");
+
+      await this.bot.sendMessage(chatId, summary);
+
+      // Send detailed errors and skipped items if any
+      const details = this.formatSyncDetails(syncResults.details);
+      if (details) {
+        await this.bot.sendMessage(chatId, details);
+      }
+    } catch (error: any) {
+      console.error("Error in Zygo parse and sync:", error);
+      await this.bot.sendMessage(chatId, `❌ [Zygo] Error: ${error.message}`);
     }
   }
 
