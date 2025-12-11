@@ -136,7 +136,24 @@ export class TelegramBotService {
 
       this.bot.sendMessage(
         msg.chat.id,
-        `📖 Available commands:\n\n/help - Show this message\n/status - Check bot status\n/myid - Get your Telegram ID\n/parseandsync - Run parsing and synchronization with Monday.com\n/events - Get events list from Monday.com\n\n📎 You can also send Eventim report links:\nSend a link like:\nhttps://webreporting.eventim.de/webreporting/public/Reports/STR_*.html\nto parse and sync Eventim data automatically.`
+        `📖 *Available Commands*\n\n` +
+          `*General:*\n` +
+          `/help - Show this help message\n` +
+          `/status - Check bot status\n` +
+          `/myid - Get your Telegram ID and token\n\n` +
+          `*Event Management:*\n` +
+          `/parseandsync - Parse and sync events with Monday.com\n` +
+          `  • Ozen - Parse Ozen events\n` +
+          `  • GoShow - Parse GoShow events\n` +
+          `  • Zygo - Parse Zygo events\n` +
+          `/events - View events list from Monday.com\n\n` +
+          `*Authorization:*\n` +
+          `/zygo_auth - Authorize Zygo account via SMS code\n\n` +
+          `📎 *Eventim Reports:*\n` +
+          `You can send Eventim report links directly:\n` +
+          `https://webreporting.eventim.de/webreporting/public/Reports/STR_*.html\n` +
+          `The bot will automatically parse and sync the data.`,
+        { parse_mode: "Markdown" }
       );
     });
 
@@ -186,8 +203,8 @@ export class TelegramBotService {
       // Получить или создать токен
       const token = this.chatIdTracker.getOrCreateToken(userId);
 
-      // Формировать сообщение
-      let message = `👤 Ваша информация:\n\n`;
+      // Format message
+      let message = `👤 Your information:\n\n`;
       message += `• Telegram ID: ${userId}\n`;
 
       if (username) {
@@ -195,13 +212,13 @@ export class TelegramBotService {
       }
 
       if (token) {
-        message += `• Токен: \`${token}\`\n`;
+        message += `• Token: \`${token}\`\n`;
       } else {
-        message += `• Токен: не доступен\n`;
+        message += `• Token: not available\n`;
       }
 
-      message += `• Статус: ${
-        isAllowed ? "✅ Авторизован" : "❌ Не авторизован"
+      message += `• Status: ${
+        isAllowed ? "✅ Authorized" : "❌ Not authorized"
       }`;
 
       this.bot.sendMessage(chatId, message, { parse_mode: "Markdown" });
@@ -264,12 +281,12 @@ export class TelegramBotService {
         if (!phone) {
           await this.bot.sendMessage(
             chatId,
-            "❌ ZYGO_USERPHONE не установлен в .env файле"
+            "❌ ZYGO_USERPHONE is not set in .env file"
           );
           return;
         }
 
-        await this.bot.sendMessage(chatId, "🔄 Отправляем код на телефон...");
+        await this.bot.sendMessage(chatId, "🔄 Sending code to phone...");
 
         // Отправка кода через API Zygo v2
         const response = await axios.post(
@@ -295,14 +312,14 @@ export class TelegramBotService {
 
         await this.bot.sendMessage(
           chatId,
-          `📱 Код отправлен на телефон ${phone}\n\n` +
-            `Введите 6-значный код из SMS:`
+          `📱 Code sent to phone ${phone}\n\n` +
+            `Enter the 6-digit code from SMS:`
         );
       } catch (error: any) {
         console.error("Error sending Zygo auth code:", error);
         await this.bot.sendMessage(
           chatId,
-          `❌ Ошибка отправки кода: ${
+          `❌ Error sending code: ${
             error.response?.data?.message || error.message
           }`
         );
@@ -572,34 +589,34 @@ export class TelegramBotService {
   }
 
   /**
-   * Обработка ввода кода Zygo от пользователя
+   * Handle Zygo code input from user
    */
   private async handleZygoCodeInput(
     userId: number,
     chatId: number,
     code: string
   ): Promise<void> {
-    // Проверить формат кода (6 цифр)
+    // Check code format (6 digits)
     if (!/^\d{6}$/.test(code)) {
       await this.bot.sendMessage(
         chatId,
-        "❌ Неверный формат кода. Введите 6-значный код из SMS:"
+        "❌ Invalid code format. Enter the 6-digit code from SMS:"
       );
       return;
     }
 
     try {
-      await this.bot.sendMessage(chatId, "🔄 Проверяем код...");
+      await this.bot.sendMessage(chatId, "🔄 Checking code...");
 
       const phone = process.env.ZYGO_USERPHONE;
       if (!phone) {
-        throw new Error("ZYGO_USERPHONE не установлен");
+        throw new Error("ZYGO_USERPHONE is not set");
       }
 
-      // Получить verify token
+      // Get verify token
       const verifyToken = this.zygoVerifyTokens.get(userId);
       if (!verifyToken) {
-        throw new Error("Verify token не найден. Попробуйте /zygo_auth снова.");
+        throw new Error("Verify token not found. Try /zygo_auth again.");
       }
 
       // Верификация кода через API Zygo v2
@@ -620,10 +637,10 @@ export class TelegramBotService {
         }
       );
 
-      // Проверить что пользователь существует и есть токены
+      // Check that user exists and has tokens
       if (!response.data.ok || !response.data.exists || !response.data.tokens) {
         throw new Error(
-          "Пользователь не найден или не авторизован. Зарегистрируйтесь на zygo.co.il сначала."
+          "User not found or not authorized. Please register on zygo.co.il first."
         );
       }
 
@@ -643,30 +660,30 @@ export class TelegramBotService {
         },
       });
 
-      // Убрать флаги ожидания
+      // Remove waiting flags
       this.awaitingZygoCode.delete(userId);
       this.zygoVerifyTokens.delete(userId);
 
       await this.bot.sendMessage(
         chatId,
-        `✅ Авторизация успешна!\n\n` +
-          `Пользователь: ${response.data.user.firstName || ""} ${
+        `✅ Authorization successful!\n\n` +
+          `User: ${response.data.user.firstName || ""} ${
             response.data.user.lastName || ""
           }\n` +
-          `Токен сохранён и будет обновляться автоматически.`
+          `Token saved and will be refreshed automatically.`
       );
     } catch (error: any) {
       console.error("Error verifying Zygo code:", error);
 
-      // Убрать флаги ожидания при ошибке
+      // Remove waiting flags on error
       this.awaitingZygoCode.delete(userId);
       this.zygoVerifyTokens.delete(userId);
 
       await this.bot.sendMessage(
         chatId,
-        `❌ Ошибка верификации кода: ${
+        `❌ Code verification error: ${
           error.response?.data?.message || error.message
-        }\n\n` + `Попробуйте снова с помощью /zygo_auth`
+        }\n\n` + `Try again using /zygo_auth`
       );
     }
   }
