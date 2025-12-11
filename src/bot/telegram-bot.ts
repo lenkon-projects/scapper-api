@@ -151,7 +151,7 @@ export class TelegramBotService {
           `/zygo_auth - Authorize Zygo account via SMS code\n\n` +
           `📎 *Eventim Reports:*\n` +
           `You can send Eventim report links directly:\n` +
-          `https://webreporting.eventim.de/webreporting/public/Reports/STR_*.html\n` +
+          `https://webreporting.eventim.de/webreporting/public/Reports/STR\\_\\*.html\n` +
           `The bot will automatically parse and sync the data.`,
         { parse_mode: "Markdown" }
       );
