@@ -1,4 +1,4 @@
-import TelegramBot from "node-telegram-bot-api";
+import { Bot, Context, InlineKeyboard } from "grammy";
 import dotenv from "dotenv";
 import { AuthService } from "./services/auth.service";
 import { ChatIdTrackerService } from "./services/chat-id-tracker.service";
@@ -15,7 +15,7 @@ import axios from "axios";
 dotenv.config();
 
 export class TelegramBotService {
-  private bot: TelegramBot;
+  private bot: Bot<Context>;
   private authService: AuthService;
   private chatIdTracker: ChatIdTrackerService;
   private config: BotConfig;
@@ -41,17 +41,18 @@ export class TelegramBotService {
 
     this.authService = new AuthService(allowedUserIds);
     this.chatIdTracker = ChatIdTrackerService.getInstance();
-    this.bot = new TelegramBot(token, { polling: true });
+    this.bot = new Bot<Context>(token);
 
     this.setupBotMenu();
     this.setupCommands();
     this.setupMessageHandler();
+    this.setupErrorHandler();
   }
 
   private async setupBotMenu(): Promise<void> {
     try {
       // Set bot commands for quick menu
-      await this.bot.setMyCommands([
+      await this.bot.api.setMyCommands([
         { command: "help", description: "📖 Command list" },
         { command: "parseandsync", description: "🔄 Parse and sync" },
         { command: "events", description: "📅 Events list" },
@@ -81,25 +82,26 @@ export class TelegramBotService {
   }
 
   private setupCommands(): void {
-    this.bot.onText(/\/start/, (msg) => {
-      const userId = msg.from?.id;
-      const username = msg.from?.username || msg.from?.first_name || "user";
+    // /start command
+    this.bot.command("start", async (ctx) => {
+      const userId = ctx.from?.id;
+      const chatId = ctx.chat?.id;
+      const username = ctx.from?.username || ctx.from?.first_name || "user";
 
-      if (!userId) {
+      if (!userId || !chatId) {
         return;
       }
 
       // Track chat ID
       this.trackUserInteraction(
         userId,
-        msg.chat.id,
-        msg.from?.username,
-        msg.from?.first_name
+        chatId,
+        ctx.from?.username,
+        ctx.from?.first_name
       );
 
       if (!this.isUserAllowed(userId)) {
-        this.bot.sendMessage(
-          msg.chat.id,
+        await ctx.reply(
           `❌ Sorry, you don't have access to this bot.\n\nYour ID: ${userId}\nSend this ID to administrator to get access.`
         );
         console.log(
@@ -108,34 +110,34 @@ export class TelegramBotService {
         return;
       }
 
-      this.bot.sendMessage(
-        msg.chat.id,
+      await ctx.reply(
         `👋 Hello, ${username}!\n\nWelcome to the events management bot.\n\nAvailable commands:\n/help - Command list\n/parseandsync - Parse and sync\n/events - Events list\n/status - Bot status\n/myid - Get your ID`
       );
     });
 
-    this.bot.onText(/\/help/, (msg) => {
-      const userId = msg.from?.id;
+    // /help command
+    this.bot.command("help", async (ctx) => {
+      const userId = ctx.from?.id;
+      const chatId = ctx.chat?.id;
 
-      if (!userId) {
+      if (!userId || !chatId) {
         return;
       }
 
       // Track chat ID
       this.trackUserInteraction(
         userId,
-        msg.chat.id,
-        msg.from?.username,
-        msg.from?.first_name
+        chatId,
+        ctx.from?.username,
+        ctx.from?.first_name
       );
 
       if (!this.isUserAllowed(userId)) {
-        this.sendAccessDeniedMessage(msg.chat.id, userId);
+        await this.sendAccessDeniedMessage(chatId, userId);
         return;
       }
 
-      this.bot.sendMessage(
-        msg.chat.id,
+      await ctx.reply(
         `📖 *Available Commands*\n\n` +
           `*General:*\n` +
           `/help - Show this help message\n` +
@@ -157,41 +159,43 @@ export class TelegramBotService {
       );
     });
 
-    this.bot.onText(/\/status/, (msg) => {
-      const userId = msg.from?.id;
+    // /status command
+    this.bot.command("status", async (ctx) => {
+      const userId = ctx.from?.id;
+      const chatId = ctx.chat?.id;
 
-      if (!userId) {
+      if (!userId || !chatId) {
         return;
       }
 
       // Track chat ID
       this.trackUserInteraction(
         userId,
-        msg.chat.id,
-        msg.from?.username,
-        msg.from?.first_name
+        chatId,
+        ctx.from?.username,
+        ctx.from?.first_name
       );
 
       if (!this.isUserAllowed(userId)) {
-        this.sendAccessDeniedMessage(msg.chat.id, userId);
+        await this.sendAccessDeniedMessage(chatId, userId);
         return;
       }
 
-      this.bot.sendMessage(
-        msg.chat.id,
+      await ctx.reply(
         `✅ Bot is working normally\n\n👥 Authorized users: ${
           this.authService.getAllowedUsers().length
         }`
       );
     });
 
-    this.bot.onText(/\/myid/, (msg) => {
-      const userId = msg.from?.id;
-      const chatId = msg.chat.id;
-      const username = msg.from?.username;
-      const firstName = msg.from?.first_name;
+    // /myid command
+    this.bot.command("myid", async (ctx) => {
+      const userId = ctx.from?.id;
+      const chatId = ctx.chat?.id;
+      const username = ctx.from?.username;
+      const firstName = ctx.from?.first_name;
 
-      if (!userId) {
+      if (!userId || !chatId) {
         return;
       }
 
@@ -221,14 +225,15 @@ export class TelegramBotService {
         isAllowed ? "✅ Authorized" : "❌ Not authorized"
       }`;
 
-      this.bot.sendMessage(chatId, message, { parse_mode: "Markdown" });
+      await ctx.reply(message, { parse_mode: "Markdown" });
     });
 
-    this.bot.onText(/\/parseandsync/, async (msg) => {
-      const userId = msg.from?.id;
-      const chatId = msg.chat.id;
+    // /parseandsync command
+    this.bot.command("parseandsync", async (ctx) => {
+      const userId = ctx.from?.id;
+      const chatId = ctx.chat?.id;
 
-      if (!userId) {
+      if (!userId || !chatId) {
         return;
       }
 
@@ -236,35 +241,34 @@ export class TelegramBotService {
       this.trackUserInteraction(
         userId,
         chatId,
-        msg.from?.username,
-        msg.from?.first_name
+        ctx.from?.username,
+        ctx.from?.first_name
       );
 
       if (!this.isUserAllowed(userId)) {
-        this.sendAccessDeniedMessage(chatId, userId);
+        await this.sendAccessDeniedMessage(chatId, userId);
         return;
       }
 
-      // Show source selection menu
-      const opts: TelegramBot.SendMessageOptions = {
-        reply_markup: {
-          inline_keyboard: [
-            [{ text: "🎭 Ozen", callback_data: "parse_ozen" }],
-            [{ text: "🎪 GoShow", callback_data: "parse_goshow" }],
-            [{ text: "🏆 Zygo", callback_data: "parse_zygo" }],
-          ],
-        },
-      };
+      // Show source selection menu with InlineKeyboard
+      const keyboard = new InlineKeyboard()
+        .text("🎭 Ozen", "parse_ozen")
+        .row()
+        .text("🎪 GoShow", "parse_goshow")
+        .row()
+        .text("🏆 Zygo", "parse_zygo");
 
-      await this.bot.sendMessage(chatId, "📋 Select parsing source:", opts);
+      await ctx.reply("📋 Select parsing source:", {
+        reply_markup: keyboard,
+      });
     });
 
-    // Zygo Auth command
-    this.bot.onText(/\/zygo_auth/, async (msg) => {
-      const userId = msg.from?.id;
-      const chatId = msg.chat.id;
+    // /zygo_auth command
+    this.bot.command("zygo_auth", async (ctx) => {
+      const userId = ctx.from?.id;
+      const chatId = ctx.chat?.id;
 
-      if (!userId) {
+      if (!userId || !chatId) {
         return;
       }
 
@@ -272,21 +276,18 @@ export class TelegramBotService {
       this.trackUserInteraction(
         userId,
         chatId,
-        msg.from?.username,
-        msg.from?.first_name
+        ctx.from?.username,
+        ctx.from?.first_name
       );
 
       try {
         const phone = process.env.ZYGO_USERPHONE;
         if (!phone) {
-          await this.bot.sendMessage(
-            chatId,
-            "❌ ZYGO_USERPHONE is not set in .env file"
-          );
+          await ctx.reply("❌ ZYGO_USERPHONE is not set in .env file");
           return;
         }
 
-        await this.bot.sendMessage(chatId, "🔄 Sending code to phone...");
+        await ctx.reply("🔄 Sending code to phone...");
 
         // Отправка кода через API Zygo v2
         const response = await axios.post(
@@ -310,15 +311,13 @@ export class TelegramBotService {
         // Установить флаг ожидания кода
         this.awaitingZygoCode.set(userId, true);
 
-        await this.bot.sendMessage(
-          chatId,
+        await ctx.reply(
           `📱 Code sent to phone ${phone}\n\n` +
             `Enter the 6-digit code from SMS:`
         );
       } catch (error: any) {
         console.error("Error sending Zygo auth code:", error);
-        await this.bot.sendMessage(
-          chatId,
+        await ctx.reply(
           `❌ Error sending code: ${
             error.response?.data?.message || error.message
           }`
@@ -326,101 +325,36 @@ export class TelegramBotService {
       }
     });
 
-    // Handle callback queries for parse source selection
-    this.bot.on("callback_query", async (query) => {
-      const userId = query.from.id;
-      const chatId = query.message?.chat.id;
-      const messageId = query.message?.message_id;
-      const data = query.data;
+    // /events command
+    this.bot.command("events", async (ctx) => {
+      const userId = ctx.from?.id;
+      const chatId = ctx.chat?.id;
 
-      if (!chatId || !data?.startsWith("parse_")) {
-        return;
-      }
-
-      // Answer callback to remove loading state
-      await this.bot.answerCallbackQuery(query.id);
-
-      // Check authorization
-      if (!this.isUserAllowed(userId)) {
-        await this.bot.answerCallbackQuery(query.id, {
-          text: "❌ Access denied",
-          show_alert: true,
-        });
-        return;
-      }
-
-      // Update the message to show selected option
-      const sourceNames: Record<string, string> = {
-        parse_ozen: "🎭 Ozen",
-        parse_goshow: "🎪 GoShow",
-        parse_eventim: "🎫 Eventim",
-        parse_zygo: "🏆 Zygo",
-        parse_both: "🔄 Both sources",
-      };
-
-      if (messageId) {
-        await this.bot.editMessageText(
-          `📋 Selected: ${sourceNames[data] || data}\n\n🔄 Starting...`,
-          { chat_id: chatId, message_id: messageId }
-        );
-      }
-
-      try {
-        if (data === "parse_ozen") {
-          await this.executeOzenParseAndSync(chatId);
-        } else if (data === "parse_goshow") {
-          await this.executeGoShowParseAndSync(chatId);
-        } else if (data === "parse_eventim") {
-          await this.executeEventimParseAndSync(chatId);
-        } else if (data === "parse_zygo") {
-          await this.executeZygoParseAndSync(chatId);
-        } else if (data === "parse_both") {
-          await this.executeOzenParseAndSync(chatId);
-          await this.executeEventimParseAndSync(chatId);
-        }
-      } catch (error) {
-        console.error("Error during parsing and synchronization:", error);
-        await this.bot.sendMessage(
-          chatId,
-          `❌ Error: ${(error as Error).message}`
-        );
-      }
-    });
-
-    this.bot.onText(/\/events/, async (msg) => {
-      const userId = msg.from?.id;
-
-      if (!userId) {
+      if (!userId || !chatId) {
         return;
       }
 
       // Track chat ID
       this.trackUserInteraction(
         userId,
-        msg.chat.id,
-        msg.from?.username,
-        msg.from?.first_name
+        chatId,
+        ctx.from?.username,
+        ctx.from?.first_name
       );
 
       if (!this.isUserAllowed(userId)) {
-        this.sendAccessDeniedMessage(msg.chat.id, userId);
+        await this.sendAccessDeniedMessage(chatId, userId);
         return;
       }
 
-      await this.bot.sendMessage(
-        msg.chat.id,
-        "📋 Getting events list from Monday.com..."
-      );
+      await ctx.reply("📋 Getting events list from Monday.com...");
 
       try {
         const mondayService = MondayService.getInstance();
         const items = await mondayService.getAllItems(50);
 
         if (items.length === 0) {
-          await this.bot.sendMessage(
-            msg.chat.id,
-            "⚠️ No events found in Monday.com"
-          );
+          await ctx.reply("⚠️ No events found in Monday.com");
           return;
         }
 
@@ -520,7 +454,7 @@ export class TelegramBotService {
           // Telegram has a message length limit, split if needed
           if (message.length > 3500) {
             message += "```";
-            this.bot.sendMessage(msg.chat.id, message, {
+            this.bot.api.sendMessage(chatId, message, {
               parse_mode: "Markdown",
             });
             message = "```\n";
@@ -530,61 +464,124 @@ export class TelegramBotService {
         message += "```";
 
         if (message.length > 0) {
-          await this.bot.sendMessage(msg.chat.id, message, {
+          await this.bot.api.sendMessage(chatId, message, {
             parse_mode: "Markdown",
           });
         }
       } catch (error) {
         console.error("Error getting events:", error);
-        await this.bot.sendMessage(
-          msg.chat.id,
-          `❌ Error getting events: ${(error as Error).message}`
+        await ctx.reply(`❌ Error getting events: ${(error as Error).message}`);
+      }
+    });
+
+    // Handle callback queries for parse source selection
+    this.bot.callbackQuery(/^parse_/, async (ctx) => {
+      const userId = ctx.from?.id;
+      const chatId = ctx.chat?.id;
+      const data = ctx.callbackQuery.data;
+
+      if (!chatId || !data) {
+        return;
+      }
+
+      // Answer callback to remove loading state
+      await ctx.answerCallbackQuery();
+
+      // Check authorization
+      if (!userId || !this.isUserAllowed(userId)) {
+        await ctx.answerCallbackQuery({
+          text: "❌ Access denied",
+          show_alert: true,
+        });
+        return;
+      }
+
+      // Update the message to show selected option
+      const sourceNames: Record<string, string> = {
+        parse_ozen: "🎭 Ozen",
+        parse_goshow: "🎪 GoShow",
+        parse_eventim: "🎫 Eventim",
+        parse_zygo: "🏆 Zygo",
+        parse_both: "🔄 Both sources",
+      };
+
+      await ctx.editMessageText(
+        `📋 Selected: ${sourceNames[data] || data}\n\n🔄 Starting...`
+      );
+
+      try {
+        if (data === "parse_ozen") {
+          await this.executeOzenParseAndSync(chatId);
+        } else if (data === "parse_goshow") {
+          await this.executeGoShowParseAndSync(chatId);
+        } else if (data === "parse_eventim") {
+          await this.executeEventimParseAndSync(chatId);
+        } else if (data === "parse_zygo") {
+          await this.executeZygoParseAndSync(chatId);
+        } else if (data === "parse_both") {
+          await this.executeOzenParseAndSync(chatId);
+          await this.executeEventimParseAndSync(chatId);
+        }
+      } catch (error) {
+        console.error("Error during parsing and synchronization:", error);
+        await this.bot.api.sendMessage(
+          chatId,
+          `❌ Error: ${(error as Error).message}`
         );
       }
     });
   }
 
   private setupMessageHandler(): void {
-    this.bot.on("message", async (msg) => {
-      const userId = msg.from?.id;
+    this.bot.on("message:text", async (ctx) => {
+      const userId = ctx.from?.id;
+      const chatId = ctx.chat?.id;
+      const text = ctx.message.text;
 
-      if (!userId) {
+      if (!userId || !chatId) {
         return;
       }
 
       // Track chat ID for any message
       this.trackUserInteraction(
         userId,
-        msg.chat.id,
-        msg.from?.username,
-        msg.from?.first_name
+        chatId,
+        ctx.from?.username,
+        ctx.from?.first_name
       );
 
       // Check if waiting for Zygo code
       if (
         this.awaitingZygoCode.get(userId) &&
-        msg.text &&
-        !msg.text.startsWith("/")
+        text &&
+        !text.startsWith("/")
       ) {
-        await this.handleZygoCodeInput(userId, msg.chat.id, msg.text);
+        await this.handleZygoCodeInput(userId, chatId, text);
         return;
       }
 
       // Check if message contains Eventim report URL
       const eventimUrlPattern =
         /https:\/\/webreporting\.eventim\.de\/webreporting\/public\/Reports\/STR_[\w-]+\.html/;
-      const match = msg.text?.match(eventimUrlPattern);
+      const match = text.match(eventimUrlPattern);
 
       if (match && this.isUserAllowed(userId)) {
         const url = match[0];
-        await this.handleEventimStaticReport(msg.chat.id, url);
+        await this.handleEventimStaticReport(chatId, url);
         return;
       }
 
       // If message is not a command and user is not authorized
-      if (!msg.text?.startsWith("/") && !this.isUserAllowed(userId)) {
-        this.sendAccessDeniedMessage(msg.chat.id, userId);
+      if (!text.startsWith("/") && !this.isUserAllowed(userId)) {
+        await this.sendAccessDeniedMessage(chatId, userId);
       }
+    });
+  }
+
+  private setupErrorHandler(): void {
+    this.bot.catch((err) => {
+      console.error(`Error while handling update ${err.ctx.update.update_id}:`);
+      console.error(err.error);
     });
   }
 
@@ -598,7 +595,7 @@ export class TelegramBotService {
   ): Promise<void> {
     // Check code format (6 digits)
     if (!/^\d{6}$/.test(code)) {
-      await this.bot.sendMessage(
+      await this.bot.api.sendMessage(
         chatId,
         "❌ Invalid code format. Enter the 6-digit code from SMS:"
       );
@@ -606,7 +603,7 @@ export class TelegramBotService {
     }
 
     try {
-      await this.bot.sendMessage(chatId, "🔄 Checking code...");
+      await this.bot.api.sendMessage(chatId, "🔄 Checking code...");
 
       const phone = process.env.ZYGO_USERPHONE;
       if (!phone) {
@@ -664,7 +661,7 @@ export class TelegramBotService {
       this.awaitingZygoCode.delete(userId);
       this.zygoVerifyTokens.delete(userId);
 
-      await this.bot.sendMessage(
+      await this.bot.api.sendMessage(
         chatId,
         `✅ Authorization successful!\n\n` +
           `User: ${response.data.user.firstName || ""} ${
@@ -679,7 +676,7 @@ export class TelegramBotService {
       this.awaitingZygoCode.delete(userId);
       this.zygoVerifyTokens.delete(userId);
 
-      await this.bot.sendMessage(
+      await this.bot.api.sendMessage(
         chatId,
         `❌ Code verification error: ${
           error.response?.data?.message || error.message
@@ -730,7 +727,7 @@ export class TelegramBotService {
   }
 
   private async executeOzenParseAndSync(chatId: number): Promise<void> {
-    await this.bot.sendMessage(
+    await this.bot.api.sendMessage(
       chatId,
       "🎭 [Ozen] Starting parsing...\n\nThis may take some time."
     );
@@ -740,23 +737,23 @@ export class TelegramBotService {
       closeAfter: true,
     });
 
-    await this.bot.sendMessage(
+    await this.bot.api.sendMessage(
       chatId,
       `✅ [Ozen] Parsing completed!\n\n📊 Total events: ${parseResult.events.length}\n📁 File: ${parseResult.outputFile}`
     );
 
     const activeEvents = parseResult.events.filter((e) => e.active === true);
-    await this.bot.sendMessage(
+    await this.bot.api.sendMessage(
       chatId,
       `🔍 [Ozen] Active events found: ${activeEvents.length} of ${parseResult.events.length}`
     );
 
     if (activeEvents.length === 0) {
-      await this.bot.sendMessage(chatId, "⚠️ [Ozen] No active events to sync");
+      await this.bot.api.sendMessage(chatId, "⚠️ [Ozen] No active events to sync");
       return;
     }
 
-    await this.bot.sendMessage(
+    await this.bot.api.sendMessage(
       chatId,
       "🔄 [Ozen] Starting sync with Monday.com..."
     );
@@ -779,17 +776,17 @@ export class TelegramBotService {
       `\n⏰ Time: ${new Date().toISOString()}`,
     ].join("\n");
 
-    await this.bot.sendMessage(chatId, summary);
+    await this.bot.api.sendMessage(chatId, summary);
 
     // Send detailed errors and skipped items if any
     const details = this.formatSyncDetails(syncResults.details);
     if (details) {
-      await this.bot.sendMessage(chatId, details);
+      await this.bot.api.sendMessage(chatId, details);
     }
   }
 
   private async executeGoShowParseAndSync(chatId: number): Promise<void> {
-    await this.bot.sendMessage(
+    await this.bot.api.sendMessage(
       chatId,
       "🎪 [GoShow] Starting parsing...\n\nThis may take some time."
     );
@@ -801,7 +798,7 @@ export class TelegramBotService {
 
     const parseResult = await scraper.execute();
 
-    await this.bot.sendMessage(
+    await this.bot.api.sendMessage(
       chatId,
       `✅ [GoShow] Parsing completed!\n\n📊 Total events: ${parseResult.events.length}\n📁 File: ${parseResult.outputFile}`
     );
@@ -816,17 +813,17 @@ export class TelegramBotService {
       },
     }));
 
-    await this.bot.sendMessage(
+    await this.bot.api.sendMessage(
       chatId,
       `🔍 [GoShow] Active events: ${activeEvents.length}`
     );
 
     if (activeEvents.length === 0) {
-      await this.bot.sendMessage(chatId, "⚠️ [GoShow] No events to sync");
+      await this.bot.api.sendMessage(chatId, "⚠️ [GoShow] No events to sync");
       return;
     }
 
-    await this.bot.sendMessage(
+    await this.bot.api.sendMessage(
       chatId,
       "🔄 [GoShow] Starting sync with Monday.com..."
     );
@@ -849,12 +846,12 @@ export class TelegramBotService {
       `\n⏰ Time: ${new Date().toISOString()}`,
     ].join("\n");
 
-    await this.bot.sendMessage(chatId, summary);
+    await this.bot.api.sendMessage(chatId, summary);
 
     // Send detailed errors and skipped items if any
     const details = this.formatSyncDetails(syncResults.details);
     if (details) {
-      await this.bot.sendMessage(chatId, details);
+      await this.bot.api.sendMessage(chatId, details);
     }
   }
 
@@ -864,7 +861,7 @@ export class TelegramBotService {
     const tokenStatus = tokenService.getTokenStatus();
 
     if (!tokenStatus.hasTokens) {
-      await this.bot.sendMessage(
+      await this.bot.api.sendMessage(
         chatId,
         '❌ [Zygo] Токены отсутствуют. Выполните /zygo_auth для авторизации.'
       );
@@ -872,7 +869,7 @@ export class TelegramBotService {
     }
 
     if (tokenStatus.isRefreshTokenInvalid) {
-      await this.bot.sendMessage(
+      await this.bot.api.sendMessage(
         chatId,
         '❌ [Zygo] Refresh токен невалиден. ' +
         'Требуется повторная авторизация через /zygo_auth'
@@ -880,7 +877,7 @@ export class TelegramBotService {
       return;
     }
 
-    await this.bot.sendMessage(
+    await this.bot.api.sendMessage(
       chatId,
       "🏆 [Zygo] Starting parsing...\n\nThis may take some time."
     );
@@ -889,13 +886,13 @@ export class TelegramBotService {
       const scraper = new ZygoScraper();
       const events = await scraper.getManagedEvents(false); // past=false для будущих событий
 
-      await this.bot.sendMessage(
+      await this.bot.api.sendMessage(
         chatId,
         `✅ [Zygo] Parsing completed!\n\n📊 Total managed events: ${events.length}`
       );
 
       if (events.length === 0) {
-        await this.bot.sendMessage(chatId, "⚠️ [Zygo] No managed events found");
+        await this.bot.api.sendMessage(chatId, "⚠️ [Zygo] No managed events found");
         return;
       }
 
@@ -913,20 +910,20 @@ export class TelegramBotService {
         },
       }));
 
-      await this.bot.sendMessage(
+      await this.bot.api.sendMessage(
         chatId,
         `🔍 [Zygo] Upcoming events: ${activeEvents.length} of ${events.length}`
       );
 
       if (activeEvents.length === 0) {
-        await this.bot.sendMessage(
+        await this.bot.api.sendMessage(
           chatId,
           "⚠️ [Zygo] No upcoming events to sync"
         );
         return;
       }
 
-      await this.bot.sendMessage(
+      await this.bot.api.sendMessage(
         chatId,
         "🔄 [Zygo] Starting sync with Monday.com..."
       );
@@ -949,21 +946,21 @@ export class TelegramBotService {
         `\n⏰ Time: ${new Date().toISOString()}`,
       ].join("\n");
 
-      await this.bot.sendMessage(chatId, summary);
+      await this.bot.api.sendMessage(chatId, summary);
 
       // Send detailed errors and skipped items if any
       const details = this.formatSyncDetails(syncResults.details);
       if (details) {
-        await this.bot.sendMessage(chatId, details);
+        await this.bot.api.sendMessage(chatId, details);
       }
     } catch (error: any) {
       console.error("Error in Zygo parse and sync:", error);
-      await this.bot.sendMessage(chatId, `❌ [Zygo] Error: ${error.message}`);
+      await this.bot.api.sendMessage(chatId, `❌ [Zygo] Error: ${error.message}`);
     }
   }
 
   private async executeEventimParseAndSync(chatId: number): Promise<void> {
-    await this.bot.sendMessage(
+    await this.bot.api.sendMessage(
       chatId,
       "🎫 [Eventim] Starting parsing...\n\nThis may take some time."
     );
@@ -975,7 +972,7 @@ export class TelegramBotService {
 
     const parseResult = await scraper.execute();
 
-    await this.bot.sendMessage(
+    await this.bot.api.sendMessage(
       chatId,
       `✅ [Eventim] Parsing completed!\n\n📊 Total events: ${parseResult.events.length}\n📁 File: ${parseResult.outputFile}`
     );
@@ -990,17 +987,17 @@ export class TelegramBotService {
       },
     }));
 
-    await this.bot.sendMessage(
+    await this.bot.api.sendMessage(
       chatId,
       `🔍 [Eventim] Active events: ${activeEvents.length}`
     );
 
     if (activeEvents.length === 0) {
-      await this.bot.sendMessage(chatId, "⚠️ [Eventim] No events to sync");
+      await this.bot.api.sendMessage(chatId, "⚠️ [Eventim] No events to sync");
       return;
     }
 
-    await this.bot.sendMessage(
+    await this.bot.api.sendMessage(
       chatId,
       "🔄 [Eventim] Starting sync with Monday.com..."
     );
@@ -1023,12 +1020,12 @@ export class TelegramBotService {
       `\n⏰ Time: ${new Date().toISOString()}`,
     ].join("\n");
 
-    await this.bot.sendMessage(chatId, summary);
+    await this.bot.api.sendMessage(chatId, summary);
 
     // Send detailed errors and skipped items if any
     const details = this.formatSyncDetails(syncResults.details);
     if (details) {
-      await this.bot.sendMessage(chatId, details);
+      await this.bot.api.sendMessage(chatId, details);
     }
   }
 
@@ -1036,7 +1033,7 @@ export class TelegramBotService {
     chatId: number,
     url: string
   ): Promise<void> {
-    await this.bot.sendMessage(
+    await this.bot.api.sendMessage(
       chatId,
       `🎫 [Eventim] Processing static HTML report...\n\n📄 URL: ${url}`
     );
@@ -1059,7 +1056,7 @@ export class TelegramBotService {
 
         skipMessage += `\n\nPlease send a more recent report.`;
 
-        await this.bot.sendMessage(chatId, skipMessage);
+        await this.bot.api.sendMessage(chatId, skipMessage);
         return;
       }
 
@@ -1074,7 +1071,7 @@ export class TelegramBotService {
         statusMessage += `\n📅 Report time: ${parseResult.printTime}`;
       }
 
-      await this.bot.sendMessage(chatId, statusMessage);
+      await this.bot.api.sendMessage(chatId, statusMessage);
 
       // Convert EventimEvent[] to Event[] (all Eventim events are active)
       const activeEvents: Event[] = parseResult.events.map((e) => ({
@@ -1087,11 +1084,11 @@ export class TelegramBotService {
       }));
 
       if (activeEvents.length === 0) {
-        await this.bot.sendMessage(chatId, "⚠️ [Eventim] No events found");
+        await this.bot.api.sendMessage(chatId, "⚠️ [Eventim] No events found");
         return;
       }
 
-      await this.bot.sendMessage(
+      await this.bot.api.sendMessage(
         chatId,
         "🔄 [Eventim] Starting sync with Monday.com..."
       );
@@ -1114,24 +1111,24 @@ export class TelegramBotService {
         `\n⏰ Time: ${new Date().toISOString()}`,
       ].join("\n");
 
-      await this.bot.sendMessage(chatId, summary);
+      await this.bot.api.sendMessage(chatId, summary);
 
       // Send detailed errors and skipped items if any
       const details = this.formatSyncDetails(syncResults.details);
       if (details) {
-        await this.bot.sendMessage(chatId, details);
+        await this.bot.api.sendMessage(chatId, details);
       }
     } catch (error) {
       console.error("Error processing Eventim static report:", error);
-      await this.bot.sendMessage(
+      await this.bot.api.sendMessage(
         chatId,
         `❌ [Eventim] Error: ${(error as Error).message}`
       );
     }
   }
 
-  private sendAccessDeniedMessage(chatId: number, userId?: number): void {
-    this.bot.sendMessage(
+  private async sendAccessDeniedMessage(chatId: number, userId?: number): Promise<void> {
+    await this.bot.api.sendMessage(
       chatId,
       `❌ Access denied.\n\n${
         userId ? `Your ID: ${userId}\n` : ""
@@ -1139,16 +1136,18 @@ export class TelegramBotService {
     );
   }
 
-  public start(): void {
+  public async start(): Promise<void> {
     console.log("🤖 Telegram bot started");
     console.log(
       `👥 Authorized users: ${this.authService.getAllowedUsers().length}`
     );
     console.log(`📋 ID list: ${this.authService.getAllowedUsers().join(", ")}`);
+
+    await this.bot.start();
   }
 
-  public stop(): void {
-    this.bot.stopPolling();
+  public async stop(): Promise<void> {
+    await this.bot.stop();
     console.log("🛑 Telegram bot stopped");
   }
 }
@@ -1156,18 +1155,18 @@ export class TelegramBotService {
 // Start bot if file is run directly
 if (require.main === module) {
   const bot = new TelegramBotService();
-  bot.start();
 
-  // Process termination handling
-  process.on("SIGINT", () => {
+  bot.start().catch(console.error);
+
+  process.on("SIGINT", async () => {
     console.log("\n👋 Received SIGINT signal, stopping bot...");
-    bot.stop();
+    await bot.stop();
     process.exit(0);
   });
 
-  process.on("SIGTERM", () => {
+  process.on("SIGTERM", async () => {
     console.log("\n👋 Received SIGTERM signal, stopping bot...");
-    bot.stop();
+    await bot.stop();
     process.exit(0);
   });
 }

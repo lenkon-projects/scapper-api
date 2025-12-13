@@ -1,3 +1,7 @@
+import { Context } from 'grammy';
+
+export type BotContext = Context;
+
 export interface BotConfig {
   token: string;
   allowedUserIds: number[];
