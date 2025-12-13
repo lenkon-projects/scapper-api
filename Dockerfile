@@ -1,7 +1,7 @@
 # ============================================
 # Stage 1: Builder (using official Puppeteer image)
 # ============================================
-FROM ghcr.io/puppeteer/puppeteer:24.31.0 AS builder
+FROM ghcr.io/puppeteer/puppeteer:24.33.0 AS builder
 
 # Switch to root for installing dependencies
 USER root
@@ -24,7 +24,7 @@ RUN npm run build
 # ============================================
 # Stage 2: Production (using official Puppeteer image)
 # ============================================
-FROM ghcr.io/puppeteer/puppeteer:24.31.0
+FROM ghcr.io/puppeteer/puppeteer:24.33.0
 
 # Switch to root for setup
 USER root

@@ -39,7 +39,7 @@
     "helmet": "^7.2.0",
     "jsdom": "^27.2.0",
     "node-telegram-bot-api": "^0.66.0",
-    "puppeteer": "^24.31.0",
+    "puppeteer": "^24.33.0",
     "puppeteer-extra": "^3.3.6",
     "puppeteer-extra-plugin-stealth": "^2.11.2",
     "swagger-jsdoc": "^6.2.8",
