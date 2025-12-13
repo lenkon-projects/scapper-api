@@ -76,22 +76,9 @@ const server = app.listen(port, () => {
     logger.info(`🏥 Health check available at http://${host}:${port}/api/health`);
 });
 
-// Zygo token auto-refresh (check every 5 minutes)
-const zygoTokenService = ZygoTokenService.getInstance();
-const tokenRefreshInterval = setInterval(async () => {
-    try {
-        await zygoTokenService.getAccessToken(); // Auto-refreshes if needed
-    } catch (error) {
-        logger.error('Zygo token refresh check failed:', error);
-    }
-}, 5 * 60 * 1000); // 5 minutes
-
-logger.info('🏆 Zygo token auto-refresh enabled (checks every 5 minutes)');
-
 // Graceful shutdown
 process.on('SIGTERM', () => {
     logger.info('SIGTERM signal received: closing HTTP server');
-    clearInterval(tokenRefreshInterval);
     server.close(() => {
         logger.info('HTTP server closed');
         process.exit(0);
@@ -100,7 +87,6 @@ process.on('SIGTERM', () => {
 
 process.on('SIGINT', () => {
     logger.info('SIGINT signal received: closing HTTP server');
-    clearInterval(tokenRefreshInterval);
     server.close(() => {
         logger.info('HTTP server closed');
         process.exit(0);

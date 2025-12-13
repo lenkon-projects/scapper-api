@@ -178,6 +178,19 @@ class ZygoScraper {
         if (error.response?.status === 401 && !originalRequest._retry) {
           originalRequest._retry = true;
 
+          // Проверить статус токена
+          const tokenStatus = this.tokenService.getTokenStatus();
+          if (tokenStatus.isRefreshTokenInvalid) {
+            logger.error(
+              '❌ Refresh токен невалиден. ' +
+              'Запрос отклонен. ' +
+              'Требуется повторная авторизация через /zygo_auth'
+            );
+            return Promise.reject(
+              new Error('Refresh токен невалиден. Требуется авторизация.')
+            );
+          }
+
           try {
             // Попытка обновить токен
             await this.tokenService.refreshAccessToken();

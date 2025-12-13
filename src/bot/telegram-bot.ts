@@ -859,6 +859,27 @@ export class TelegramBotService {
   }
 
   private async executeZygoParseAndSync(chatId: number): Promise<void> {
+    // Проверить статус токена перед началом парсинга
+    const tokenService = ZygoTokenService.getInstance();
+    const tokenStatus = tokenService.getTokenStatus();
+
+    if (!tokenStatus.hasTokens) {
+      await this.bot.sendMessage(
+        chatId,
+        '❌ [Zygo] Токены отсутствуют. Выполните /zygo_auth для авторизации.'
+      );
+      return;
+    }
+
+    if (tokenStatus.isRefreshTokenInvalid) {
+      await this.bot.sendMessage(
+        chatId,
+        '❌ [Zygo] Refresh токен невалиден. ' +
+        'Требуется повторная авторизация через /zygo_auth'
+      );
+      return;
+    }
+
     await this.bot.sendMessage(
       chatId,
       "🏆 [Zygo] Starting parsing...\n\nThis may take some time."
