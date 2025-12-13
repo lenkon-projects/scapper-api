@@ -3,6 +3,7 @@ import ZygoScraper from "../core/zygo-scraper";
 import MondayService from "../api/services/monday.service";
 import { TelegramNotificationService } from "../bot/services/telegram-notification.service";
 import { Event } from "../core/types";
+import ZygoTokenService from "../services/zygo-token.service";
 
 /**
  * Zygo Parse & Sync Script
@@ -28,6 +29,40 @@ async function main() {
   console.log("");
 
   try {
+    // ========================================
+    // Phase 0: Validate Token
+    // ========================================
+    console.log("[ZygoSync] Phase 0: Validating Zygo authentication...");
+    const tokenService = ZygoTokenService.getInstance();
+    const tokenStatus = tokenService.getTokenStatus();
+
+    // Проверка наличия токенов
+    if (!tokenStatus.hasTokens) {
+      console.log("[ZygoSync] ⚠️  No tokens found. Exiting silently.");
+      console.log("[ZygoSync] ℹ️  Please authorize via /zygo_auth command.");
+      process.exit(0);
+    }
+
+    // Проверка флага невалидности refresh токена
+    if (tokenStatus.isRefreshTokenInvalid) {
+      console.log("[ZygoSync] ⚠️  Refresh token is invalid. Exiting silently.");
+      console.log("[ZygoSync] ℹ️  Please re-authorize via /zygo_auth command.");
+      process.exit(0);
+    }
+
+    // Попытка обновить токен если требуется
+    try {
+      await tokenService.getAccessToken();
+    } catch (tokenError: any) {
+      // Если токен не удалось обновить, выходим молча
+      console.log("[ZygoSync] ⚠️  Failed to refresh access token. Exiting silently.");
+      console.log("[ZygoSync] ℹ️  Please re-authorize via /zygo_auth command.");
+      process.exit(0);
+    }
+
+    console.log("[ZygoSync] ✅ Token validation successful");
+    console.log("");
+
     // ========================================
     // Phase 1: Execute Zygo API Fetch
     // ========================================
