@@ -207,7 +207,18 @@ async function main() {
       console.error(`  ${error}`);
     }
 
-    // Send notification to all Telegram users
+    // Проверка на ошибку невалидного токена
+    const isTokenError = errorObj.message.includes('Refresh токен невалиден') ||
+                         errorObj.message.includes('Требуется авторизация');
+
+    if (isTokenError) {
+      // При ошибке токена - выходим молча без отправки уведомления
+      console.log("[ZygoSync] ⚠️  Token authentication failed. Exiting silently.");
+      console.log("[ZygoSync] ℹ️  Please re-authorize via /zygo_auth command.");
+      process.exit(0);
+    }
+
+    // Send notification to all Telegram users (только для не-токен ошибок)
     try {
       console.log(
         "[ZygoSync] Sending error notification to Telegram users..."
