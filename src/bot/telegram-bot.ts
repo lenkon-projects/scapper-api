@@ -204,7 +204,7 @@ export class TelegramBotService {
 
       const isAllowed = this.isUserAllowed(userId);
 
-      // Получить или создать токен
+      // Get or create token
       const token = this.chatIdTracker.getOrCreateToken(userId);
 
       // Format message
@@ -289,7 +289,7 @@ export class TelegramBotService {
 
         await ctx.reply("🔄 Sending code to phone...");
 
-        // Отправка кода через API Zygo v2
+        // Send code via Zygo API v2
         const response = await axios.post(
           "https://api.zygo.co.il/v2/auth/create-verify-token",
           { phone },
@@ -303,12 +303,12 @@ export class TelegramBotService {
           }
         );
 
-        // Сохранить verify token
+        // Save verify token
         if (response.data?.token) {
           this.zygoVerifyTokens.set(userId, response.data.token);
         }
 
-        // Установить флаг ожидания кода
+        // Set flag to wait for code
         this.awaitingZygoCode.set(userId, true);
 
         await ctx.reply(
@@ -616,7 +616,7 @@ export class TelegramBotService {
         throw new Error("Verify token not found. Try /zygo_auth again.");
       }
 
-      // Верификация кода через API Zygo v2
+      // Verify code via Zygo API v2
       const response = await axios.post<any>(
         "https://api.zygo.co.il/v2/auth/verify-phone-code-register-check-if-user",
         {
@@ -641,7 +641,7 @@ export class TelegramBotService {
         );
       }
 
-      // Сохранить токены через ZygoTokenService
+      // Save tokens via ZygoTokenService
       const tokenService = ZygoTokenService.getInstance();
       tokenService.setTokens({
         user: response.data.user,
@@ -856,14 +856,14 @@ export class TelegramBotService {
   }
 
   private async executeZygoParseAndSync(chatId: number): Promise<void> {
-    // Проверить статус токена перед началом парсинга
+    // Check token status before starting parsing
     const tokenService = ZygoTokenService.getInstance();
     const tokenStatus = tokenService.getTokenStatus();
 
     if (!tokenStatus.hasTokens) {
       await this.bot.api.sendMessage(
         chatId,
-        '❌ [Zygo] Токены отсутствуют. Выполните /zygo_auth для авторизации.'
+        '❌ [Zygo] Tokens are missing. Execute /zygo_auth to authorize.'
       );
       return;
     }
@@ -871,8 +871,8 @@ export class TelegramBotService {
     if (tokenStatus.isRefreshTokenInvalid) {
       await this.bot.api.sendMessage(
         chatId,
-        '❌ [Zygo] Refresh токен невалиден. ' +
-        'Требуется повторная авторизация через /zygo_auth'
+        '❌ [Zygo] Refresh token is invalid. ' +
+        'Re-authorization is required via /zygo_auth'
       );
       return;
     }
@@ -884,7 +884,7 @@ export class TelegramBotService {
 
     try {
       const scraper = new ZygoScraper();
-      const events = await scraper.getManagedEvents(false); // past=false для будущих событий
+      const events = await scraper.getManagedEvents(false); // past=false for future events
 
       await this.bot.api.sendMessage(
         chatId,
@@ -896,17 +896,17 @@ export class TelegramBotService {
         return;
       }
 
-      // Фильтровать только будущие события
+      // Filter only future events
       const now = new Date();
       const upcomingEvents = events.filter((e) => new Date(e.startDate) > now);
 
-      // Преобразовать в формат Event для Monday.com
+      // Convert to Event format for Monday.com
       const activeEvents: Event[] = upcomingEvents.map((e) => ({
         active: true,
         eventId: e.identifier,
         ticketsSold: {
-          total: e.analytics?.approved || 0, // Используем реальное количество проданных билетов
-          // capacity НЕ передаётся - заполняется в Monday.com вручную
+          total: e.analytics?.approved || 0, // Use actual number of sold tickets
+          // capacity is NOT passed - filled in Monday.com manually
         },
       }));
 
