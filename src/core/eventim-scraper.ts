@@ -757,20 +757,24 @@ export class EventimScraper {
             }
           });
 
-          // Find capacity and sold
+          // Find capacity, reservations, and sold
           // Capacity is usually at index 1 (Total Capacity)
+          // Reservations Quantity is at index 5
           // Available is usually the last number
           let capacity = 0;
+          let reservations = 0;
           let available = 0;
 
           if (numbers.length >= 2) {
             // Total Capacity is typically the second number (after RF which is 0)
             capacity = numbers[1] || 0;
+            // Reservations Quantity is at index 5
+            reservations = numbers[5] || 0;
             // Available seats is the last number
             available = numbers[numbers.length - 1] || 0;
           }
 
-          const sold = capacity - available;
+          const sold = capacity - (available + reservations);
 
           // Mark this event as seen
           seenEventIds.add(eventId);
@@ -917,14 +921,16 @@ export class EventimScraper {
         });
 
         let capacity = 0;
+        let reservations = 0;
         let available = 0;
 
         if (numbers.length >= 2) {
           capacity = numbers[1] || 0;
+          reservations = numbers[5] || 0;
           available = numbers[numbers.length - 1] || 0;
         }
 
-        const sold = capacity - available;
+        const sold = capacity - (available + reservations);
         seenEventIds.add(eventId);
 
         events.push({
