@@ -31,15 +31,20 @@ async function parseEventsTable(page: Page): Promise<Event[]> {
 
             const ticketsEl = row.querySelector('td.column-tickets_sold');
             if (ticketsEl) {
-                const text = ticketsEl.textContent?.trim() || '';
-
                 const ticketData: any = {};
 
-                const totalMatch = text.match(/מכירות קודמות\s*:\s*(\d+)/);
-                if (totalMatch) {
-                    ticketData.total = parseInt(totalMatch[1]);
+                // Get total from tickets-sold div
+                const ticketsSoldDiv = ticketsEl.querySelector('div.tickets-sold');
+                if (ticketsSoldDiv) {
+                    const divText = ticketsSoldDiv.textContent?.trim() || '';
+                    const totalMatch = divText.match(/(\d+)/);
+                    if (totalMatch) {
+                        ticketData.total = parseInt(totalMatch[1]);
+                    }
                 }
 
+                // Get capacity from the cell text
+                const text = ticketsEl.textContent?.trim() || '';
                 const capacityMatch = text.match(/מלאי מקורי\s*:\s*(\d+)/);
                 if (capacityMatch) {
                     ticketData.capacity = parseInt(capacityMatch[1]);
