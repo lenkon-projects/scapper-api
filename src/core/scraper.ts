@@ -35,7 +35,7 @@ async function parseEventsTable(page: Page): Promise<Event[]> {
 
                 const ticketData: any = {};
 
-                const totalMatch = text.match(/סה״כ\s*:\s*(\d+)/);
+                const totalMatch = text.match(/מכירות קודמות\s*:\s*(\d+)/);
                 if (totalMatch) {
                     ticketData.total = parseInt(totalMatch[1]);
                 }
