@@ -21,6 +21,11 @@ services:
       HEADLESS: "true"
       CLOSE_BROWSER: "true"
 
+    # Use faster DNS servers
+    dns:
+      - 1.1.1.1
+      - 8.8.8.8
+
     volumes:
       # Persistent storage for parsed data, logs, and bot data
       - ./output:/app/output

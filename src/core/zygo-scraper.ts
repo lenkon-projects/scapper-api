@@ -3,13 +3,16 @@
  * Парсер для получения событий с https://zygo.co.il через их API
  */
 
-import axios, { AxiosInstance } from 'axios';
-import ZygoTokenService from '../services/zygo-token.service';
+import axios, { AxiosInstance } from "axios";
+import ZygoTokenService from "../services/zygo-token.service";
 
 const logger = {
-  info: (msg: string, ...args: any[]) => console.log(`[ZygoScraper] ${msg}`, ...args),
-  error: (msg: string, ...args: any[]) => console.error(`[ZygoScraper] ${msg}`, ...args),
-  warn: (msg: string, ...args: any[]) => console.warn(`[ZygoScraper] ${msg}`, ...args),
+  info: (msg: string, ...args: any[]) =>
+    console.log(`[ZygoScraper] ${msg}`, ...args),
+  error: (msg: string, ...args: any[]) =>
+    console.error(`[ZygoScraper] ${msg}`, ...args),
+  warn: (msg: string, ...args: any[]) =>
+    console.warn(`[ZygoScraper] ${msg}`, ...args),
 };
 
 interface ZygoLocation {
@@ -135,8 +138,8 @@ export interface ZygoVenue {
 
 class ZygoScraper {
   private client: AxiosInstance;
-  private baseURL = 'https://api.zygo.co.il';
-  private apiVersion = 'v1';
+  private baseURL = "https://api.zygo.co.il";
+  private apiVersion = "v1";
   private tokenService: ZygoTokenService;
 
   constructor() {
@@ -145,13 +148,14 @@ class ZygoScraper {
     this.client = axios.create({
       baseURL: this.baseURL,
       headers: {
-        'accept': 'application/json',
-        'content-type': 'application/json',
-        'origin': 'https://zygo.co.il',
-        'referer': 'https://zygo.co.il/',
-        'user-agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36'
+        accept: "application/json",
+        "content-type": "application/json",
+        origin: "https://zygo.co.il",
+        referer: "https://zygo.co.il/",
+        "user-agent":
+          "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36",
       },
-      timeout: 30000
+      timeout: 90000,
     });
 
     // Interceptor для автоматической авторизации
@@ -182,12 +186,12 @@ class ZygoScraper {
           const tokenStatus = this.tokenService.getTokenStatus();
           if (tokenStatus.isRefreshTokenInvalid) {
             logger.error(
-              '❌ Refresh токен невалиден. ' +
-              'Запрос отклонен. ' +
-              'Требуется повторная авторизация через /zygo_auth'
+              "❌ Refresh токен невалиден. " +
+                "Запрос отклонен. " +
+                "Требуется повторная авторизация через /zygo_auth"
             );
             return Promise.reject(
-              new Error('Refresh токен невалиден. Требуется авторизация.')
+              new Error("Refresh токен невалиден. Требуется авторизация.")
             );
           }
 
@@ -203,7 +207,7 @@ class ZygoScraper {
 
             return this.client.request(originalRequest);
           } catch (refreshError) {
-            logger.error('Token refresh failed:', refreshError);
+            logger.error("Token refresh failed:", refreshError);
             return Promise.reject(refreshError);
           }
         }
@@ -218,10 +222,10 @@ class ZygoScraper {
    */
   async healthCheck(): Promise<boolean> {
     try {
-      const response = await this.client.get('/health');
-      return response.data === 'OK';
+      const response = await this.client.get("/health");
+      return response.data === "OK";
     } catch (error) {
-      logger.error('Health check failed:', error);
+      logger.error("Health check failed:", error);
       return false;
     }
   }
@@ -231,17 +235,17 @@ class ZygoScraper {
    */
   async getEvents(): Promise<ZygoEvent[]> {
     try {
-      logger.info('Fetching events from Zygo API...');
+      logger.info("Fetching events from Zygo API...");
       const response = await this.client.get(`/${this.apiVersion}/event`);
 
       if (!Array.isArray(response.data)) {
-        throw new Error('Expected array of events');
+        throw new Error("Expected array of events");
       }
 
       logger.info(`Fetched ${response.data.length} events from Zygo`);
       return response.data;
     } catch (error: any) {
-      logger.error('Failed to fetch events:', error.message);
+      logger.error("Failed to fetch events:", error.message);
       throw error;
     }
   }
@@ -251,7 +255,9 @@ class ZygoScraper {
    */
   async getEventById(eventId: string): Promise<ZygoEvent | null> {
     try {
-      const response = await this.client.get(`/${this.apiVersion}/event/${eventId}`);
+      const response = await this.client.get(
+        `/${this.apiVersion}/event/${eventId}`
+      );
       return response.data;
     } catch (error: any) {
       if (error.response?.status === 404) {
@@ -282,34 +288,39 @@ class ZygoScraper {
 
       if (query.search) {
         const searchLower = query.search.toLowerCase();
-        filtered = filtered.filter(event =>
-          event.title.toLowerCase().includes(searchLower) ||
-          event.description.toLowerCase().includes(searchLower)
+        filtered = filtered.filter(
+          (event) =>
+            event.title.toLowerCase().includes(searchLower) ||
+            event.description.toLowerCase().includes(searchLower)
         );
       }
 
       if (query.minAge !== undefined) {
-        filtered = filtered.filter(event => event.minAge <= query.minAge!);
+        filtered = filtered.filter((event) => event.minAge <= query.minAge!);
       }
 
       if (query.startDate) {
-        filtered = filtered.filter(event => new Date(event.startDate) >= new Date(query.startDate!));
+        filtered = filtered.filter(
+          (event) => new Date(event.startDate) >= new Date(query.startDate!)
+        );
       }
 
       if (query.endDate) {
-        filtered = filtered.filter(event => new Date(event.endDate) <= new Date(query.endDate!));
+        filtered = filtered.filter(
+          (event) => new Date(event.endDate) <= new Date(query.endDate!)
+        );
       }
 
       if (query.location) {
         const locationLower = query.location.toLowerCase();
-        filtered = filtered.filter(event =>
+        filtered = filtered.filter((event) =>
           event.location.address.toLowerCase().includes(locationLower)
         );
       }
 
       return filtered;
     } catch (error: any) {
-      logger.error('Failed to search events:', error.message);
+      logger.error("Failed to search events:", error.message);
       throw error;
     }
   }
@@ -323,12 +334,15 @@ class ZygoScraper {
       const now = new Date();
 
       const upcoming = allEvents
-        .filter(event => new Date(event.startDate) > now)
-        .sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime());
+        .filter((event) => new Date(event.startDate) > now)
+        .sort(
+          (a, b) =>
+            new Date(a.startDate).getTime() - new Date(b.startDate).getTime()
+        );
 
       return limit ? upcoming.slice(0, limit) : upcoming;
     } catch (error: any) {
-      logger.error('Failed to fetch upcoming events:', error.message);
+      logger.error("Failed to fetch upcoming events:", error.message);
       throw error;
     }
   }
@@ -348,11 +362,13 @@ class ZygoScraper {
       const allEvents = await this.getEvents();
 
       // Сортировка по количеству типов билетов (можно адаптировать)
-      const sorted = allEvents.sort((a, b) => b.tickets.length - a.tickets.length);
+      const sorted = allEvents.sort(
+        (a, b) => b.tickets.length - a.tickets.length
+      );
 
       return sorted.slice(0, limit);
     } catch (error: any) {
-      logger.error('Failed to fetch popular events:', error.message);
+      logger.error("Failed to fetch popular events:", error.message);
       throw error;
     }
   }
@@ -363,9 +379,9 @@ class ZygoScraper {
   normalizeEvent(event: ZygoEvent): any {
     return {
       external_id: event.id,
-      source: 'zygo',
+      source: "zygo",
       title: event.title,
-      description: event.description || '',
+      description: event.description || "",
       date: event.startDate,
       end_date: event.endDate,
       location: event.location.address,
@@ -389,8 +405,8 @@ class ZygoScraper {
         tickets_count: event.tickets.length,
         creator_username: event.creator.username,
         identifier: event.identifier,
-        identifier_number: event.identifier_number
-      }
+        identifier_number: event.identifier_number,
+      },
     };
   }
 
@@ -410,23 +426,25 @@ class ZygoScraper {
 
     const stats = {
       total: events.length,
-      upcoming: events.filter(e => new Date(e.startDate) > now).length,
-      past: events.filter(e => new Date(e.startDate) <= now).length,
+      upcoming: events.filter((e) => new Date(e.startDate) > now).length,
+      past: events.filter((e) => new Date(e.startDate) <= now).length,
       by_location: {} as { [key: string]: number },
       by_currency: {} as { [key: string]: number },
-      avg_price: 0
+      avg_price: 0,
     };
 
     let totalPrice = 0;
     let priceCount = 0;
 
-    events.forEach(event => {
+    events.forEach((event) => {
       // Группировка по локации
-      const location = event.location.address.split(',').pop()?.trim() || 'Unknown';
+      const location =
+        event.location.address.split(",").pop()?.trim() || "Unknown";
       stats.by_location[location] = (stats.by_location[location] || 0) + 1;
 
       // Группировка по валюте
-      stats.by_currency[event.currency] = (stats.by_currency[event.currency] || 0) + 1;
+      stats.by_currency[event.currency] =
+        (stats.by_currency[event.currency] || 0) + 1;
 
       // Средняя цена
       if (event.priceRange.min !== null) {
@@ -445,7 +463,7 @@ class ZygoScraper {
    */
   async getManagedEvents(past: boolean = false): Promise<any[]> {
     try {
-      logger.info('Fetching managed events from Zygo API...');
+      logger.info("Fetching managed events from Zygo API...");
 
       const allEvents: any[] = [];
       let page = 1;
@@ -469,7 +487,7 @@ class ZygoScraper {
       logger.info(`Fetched ${allEvents.length} managed events from Zygo`);
       return allEvents;
     } catch (error: any) {
-      logger.error('Failed to fetch managed events:', error.message);
+      logger.error("Failed to fetch managed events:", error.message);
       throw error;
     }
   }

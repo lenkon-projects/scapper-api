@@ -31,6 +31,13 @@ USER root
 
 WORKDIR /app
 
+# Update system packages and install CA certificates
+RUN apt-get update && \
+    apt-get upgrade -y && \
+    apt-get install -y ca-certificates && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+
 # Copy package files
 COPY package*.json ./
 
