@@ -27,10 +27,7 @@ services:
       - 8.8.8.8
 
     volumes:
-      # Persistent storage for parsed data, logs, and bot data
-      - ./output:/app/output
-      - ./logs:/app/logs
-      - ./data:/app/data
+      - wordpress-parser-data:/app/data
 
     # Security settings
     security_opt:
@@ -64,3 +61,6 @@ services:
 networks:
   default:
     name: wordpress-parser-network
+
+volumes:
+  wordpress-parser-data:
