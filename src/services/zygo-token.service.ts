@@ -62,9 +62,13 @@ class ZygoTokenService {
 
   private constructor() {
     this.tokensFilePath = path.join(process.cwd(), "data", "zygo_tokens.json");
+    console.log(
+      `[ZygoTokenService] Initializing with tokens file: ${this.tokensFilePath}`,
+    );
+
     this.refreshBeforeExpiryMin = parseInt(
       process.env.ZYGO_TOKEN_REFRESH_BEFORE_EXPIRY_MIN || "5",
-      10
+      10,
     );
 
     // Создать директорию data если не существует
@@ -101,7 +105,7 @@ class ZygoTokenService {
 
         if (this.isRefreshTokenInvalid) {
           logger.warn(
-            "⚠️ Refresh токен помечен как невалидный. Требуется повторная авторизация через /zygo_auth"
+            "⚠️ Refresh токен помечен как невалидный. Требуется повторная авторизация через /zygo_auth",
           );
         }
       } else {
@@ -123,7 +127,7 @@ class ZygoTokenService {
         fs.writeFileSync(
           this.tokensFilePath,
           JSON.stringify(this.tokens, null, 2),
-          "utf-8"
+          "utf-8",
         );
         logger.info("Токены сохранены в файл");
       }
@@ -157,7 +161,7 @@ class ZygoTokenService {
     logger.info(
       `Токены установлены для пользователя: ${
         authResponse.user.username || authResponse.user.id
-      }`
+      }`,
     );
   }
 
@@ -187,7 +191,7 @@ class ZygoTokenService {
 
     if (this.isRefreshTokenInvalid) {
       throw new Error(
-        "Refresh токен невалиден. Требуется повторная авторизация через /zygo_auth"
+        "Refresh токен невалиден. Требуется повторная авторизация через /zygo_auth",
       );
     }
 
@@ -204,7 +208,7 @@ class ZygoTokenService {
             "Content-Type": "application/json",
             Accept: "application/json",
           },
-        }
+        },
       );
 
       // Обновить токены
@@ -222,18 +226,18 @@ class ZygoTokenService {
 
         logger.error(
           "❌ Refresh токен невалиден (401). " +
-            "Требуется повторная авторизация через /zygo_auth"
+            "Требуется повторная авторизация через /zygo_auth",
         );
 
         throw new Error(
-          "Refresh токен невалиден. Требуется повторная авторизация через /zygo_auth"
+          "Refresh токен невалиден. Требуется повторная авторизация через /zygo_auth",
         );
       }
 
       // Для других ошибок - стандартная обработка
       logger.error(
         "❌ Ошибка обновления токена:",
-        error.response?.data || error.message
+        error.response?.data || error.message,
       );
       throw new Error(`Не удалось обновить токен: ${error.message}`);
     }
@@ -253,7 +257,7 @@ class ZygoTokenService {
       logger.warn(
         "⚠️ Refresh токен невалиден. " +
           "Автоматическое обновление отключено. " +
-          "Требуется повторная авторизация через /zygo_auth"
+          "Требуется повторная авторизация через /zygo_auth",
       );
       return null;
     }
@@ -261,7 +265,7 @@ class ZygoTokenService {
     // Проверить срок действия access токена
     if (this.isTokenExpiringSoon(this.tokens.access_token_expires)) {
       logger.info(
-        `⏰ Access токен истекает через < ${this.refreshBeforeExpiryMin} минут, обновление...`
+        `⏰ Access токен истекает через < ${this.refreshBeforeExpiryMin} минут, обновление...`,
       );
       try {
         await this.refreshAccessToken();
@@ -340,7 +344,7 @@ class ZygoTokenService {
     const now = new Date();
     const accessExpiryDate = new Date(this.tokens.access_token_expires);
     const minutesUntilAccessExpiry = Math.floor(
-      (accessExpiryDate.getTime() - now.getTime()) / (1000 * 60)
+      (accessExpiryDate.getTime() - now.getTime()) / (1000 * 60),
     );
 
     return {
