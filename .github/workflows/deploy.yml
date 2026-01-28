@@ -132,12 +132,10 @@ jobs:
             echo "=== Recent Logs ==="
             docker compose logs --tail=50
 
-      - name: Health check
-        run: |
-          echo "Waiting for service to start..."
-          sleep 15
+            echo "Waiting for service to start (15s)..."
+            sleep 15
 
-          echo "Checking health endpoint..."
-          curl -f http://127.0.0.1:3000/api/health || exit 1
+            echo "Checking health endpoint..."
+            curl -f http://127.0.0.1:3000/api/health || exit 1
 
-          echo "✅ Deployment successful!"
+            echo "✅ Deployment successful!"
