@@ -81,7 +81,7 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           port: 22
           source: "docker-compose.yml,.env.production"
-          target: "/root/wordpress-parser"
+          target: "~/wordpress-parser"
 
       - name: Deploy to server
         uses: appleboy/ssh-action@master
@@ -134,6 +134,6 @@ jobs:
           sleep 15
 
           echo "Checking health endpoint..."
-          curl -f https://scrapper.liorizhakidrums.com/api/health || exit 1
+          curl -f http://127.0.0.1:3000/api/health || exit 1
 
           echo "✅ Deployment successful!"
