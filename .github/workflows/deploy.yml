@@ -91,7 +91,7 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           port: 22
           script: |
-            cd /root/wordpress-parser
+            cd ~/wordpress-parser
             mv .env.production .env
 
             # Create output and logs directories with proper permissions
