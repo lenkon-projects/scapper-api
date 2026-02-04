@@ -17,7 +17,8 @@
     "eventim:sync:dev": "tsx src/scripts/eventim_parse_and_sync.ts",
     "eventim:sync:prod": "node dist/scripts/eventim_parse_and_sync.js",
     "goshow:sync:dev": "tsx src/scripts/goshow_parse_and_sync.ts",
-    "goshow:sync:prod": "node dist/scripts/goshow_parse_and_sync.js"
+    "goshow:sync:prod": "node dist/scripts/goshow_parse_and_sync.js",
+    "test:sheets": "tsx src/scripts/test_google_sheets.ts"
   },
   "keywords": [
     "puppeteer",
@@ -35,6 +36,7 @@
     "express": "^4.21.2",
     "express-rate-limit": "^7.5.1",
     "express-winston": "^4.2.0",
+    "googleapis": "^171.0.0",
     "grammy": "^1.22.0",
     "helmet": "^7.2.0",
     "jsdom": "^27.2.0",

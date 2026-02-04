@@ -44,3 +44,4 @@ docker-compose.override.yml
 # Telegram data
 data/chat_ids.json
 env-secret-content.txt
+/*.json

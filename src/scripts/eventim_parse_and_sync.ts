@@ -1,6 +1,7 @@
 import "dotenv/config";
 import { EventimScraper } from "../core/eventim-scraper";
 import MondayService from "../api/services/monday.service";
+import GoogleSheetsService from "../services/google-sheets.service";
 import { TelegramNotificationService } from "../bot/services/telegram-notification.service";
 import { Event } from "../core/types";
 
@@ -141,7 +142,29 @@ async function main() {
     console.log("");
 
     // ========================================
-    // Phase 7: Exit with Appropriate Code
+    // Phase 7: Sync to Google Sheets
+    // ========================================
+    console.log("[EventimSync] Phase 7: Starting sync to Google Sheets...");
+    try {
+      const sheetsService = GoogleSheetsService.getInstance();
+      const sheetsResult = await sheetsService.syncActiveEvents(
+        activeEvents,
+        syncTimestamp,
+        "ZAP-"
+      );
+
+      console.log("[EventimSync] Google Sheets Sync Summary:");
+      console.log(`  Successful Updates:  ${sheetsResult.successfulUpdates}`);
+      console.log(`  Skipped:             ${sheetsResult.skipped}`);
+      console.log(`  Errors:              ${sheetsResult.errors}`);
+      console.log("─".repeat(60));
+      console.log("");
+    } catch (sheetsError) {
+      console.error("[EventimSync] Google Sheets sync failed:", sheetsError);
+    }
+
+    // ========================================
+    // Phase 8: Exit with Appropriate Code
     // ========================================
     if (result.errors === result.totalProcessed && result.totalProcessed > 0) {
       console.log("[EventimSync] All events failed. Exiting with error code.");

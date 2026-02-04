@@ -3,6 +3,7 @@ import { ValidationError, ScraperError } from '../types/errors';
 import { EventimParseAndSyncRequest, EventimParseAndSyncResponse } from '../types/eventim-api.types';
 import { EventimScraper } from '../../core/eventim-scraper';
 import MondayService from '../services/monday.service';
+import GoogleSheetsService from '../../services/google-sheets.service';
 import { Event } from '../../core/types';
 
 /**
@@ -71,16 +72,29 @@ export const parseAndSync = async (
       },
     }));
 
-    // 6. Sync with Monday.com (if events exist)
+    // 6. Sync with Monday.com and Google Sheets (if events exist)
     let syncResults;
+    let sheetsSyncResults;
     if (activeEvents.length > 0) {
-      const mondayService = MondayService.getInstance();
       const syncTimestamp = new Date();
+
+      const mondayService = MondayService.getInstance();
       syncResults = await mondayService.syncActiveEvents(
         activeEvents,
         syncTimestamp,
         'ZAP-'
       );
+
+      try {
+        const sheetsService = GoogleSheetsService.getInstance();
+        sheetsSyncResults = await sheetsService.syncActiveEvents(
+          activeEvents,
+          syncTimestamp,
+          'ZAP-'
+        );
+      } catch (sheetsError) {
+        console.error('Google Sheets sync failed:', sheetsError);
+      }
     }
 
     // 7. Build comprehensive response
@@ -101,6 +115,7 @@ export const parseAndSync = async (
         processingTime: Date.now() - startTime,
       },
       sync: syncResults,
+      sheetsSync: sheetsSyncResults,
     };
 
     res.status(200).json(response);

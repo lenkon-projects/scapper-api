@@ -28,6 +28,7 @@ services:
 
     volumes:
       - wordpress-parser-data:/app/data
+      - ./credentials.json:/app/credentials.json:ro
 
     # Security settings
     security_opt:

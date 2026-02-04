@@ -9,6 +9,7 @@ import { GoShowScraper } from "../core/goshow-scraper";
 import ZygoScraper from "../core/zygo-scraper";
 import { Event } from "../core/types";
 import MondayService from "../api/services/monday.service";
+import GoogleSheetsService from "../services/google-sheets.service";
 import ZygoTokenService from "../services/zygo-token.service";
 import axios from "axios";
 
@@ -768,15 +769,35 @@ export class TelegramBotService {
 
     const summary = [
       "✅ [Ozen] Sync completed!\n",
-      `📊 Results:`,
+      `📊 Monday.com:`,
       `• Processed: ${syncResults.totalProcessed}`,
       `• Successfully updated: ${syncResults.successfulUpdates}`,
       `• Skipped: ${syncResults.skipped}`,
       `• Errors: ${syncResults.errors}`,
-      `\n⏰ Time: ${new Date().toISOString()}`,
-    ].join("\n");
+    ];
 
-    await this.bot.api.sendMessage(chatId, summary);
+    // Google Sheets sync
+    try {
+      const sheetsService = GoogleSheetsService.getInstance();
+      const sheetsSyncResults = await sheetsService.syncActiveEvents(
+        activeEvents,
+        syncTimestamp,
+        "OZ-"
+      );
+
+      summary.push(
+        `\n📊 Google Sheets:`,
+        `• Updated: ${sheetsSyncResults.successfulUpdates}`,
+        `• Skipped: ${sheetsSyncResults.skipped}`,
+        `• Errors: ${sheetsSyncResults.errors}`
+      );
+    } catch (sheetsError) {
+      console.error("[Ozen] Google Sheets sync error:", sheetsError);
+      summary.push(`\n⚠️ Google Sheets sync failed`);
+    }
+
+    summary.push(`\n⏰ Time: ${new Date().toISOString()}`);
+    await this.bot.api.sendMessage(chatId, summary.join("\n"));
 
     // Send detailed errors and skipped items if any
     const details = this.formatSyncDetails(syncResults.details);
@@ -838,15 +859,35 @@ export class TelegramBotService {
 
     const summary = [
       "✅ [GoShow] Sync completed!\n",
-      `📊 Results:`,
+      `📊 Monday.com:`,
       `• Processed: ${syncResults.totalProcessed}`,
       `• Successfully updated: ${syncResults.successfulUpdates}`,
       `• Skipped: ${syncResults.skipped}`,
       `• Errors: ${syncResults.errors}`,
-      `\n⏰ Time: ${new Date().toISOString()}`,
-    ].join("\n");
+    ];
 
-    await this.bot.api.sendMessage(chatId, summary);
+    // Google Sheets sync
+    try {
+      const sheetsService = GoogleSheetsService.getInstance();
+      const sheetsSyncResults = await sheetsService.syncActiveEvents(
+        activeEvents,
+        syncTimestamp,
+        "GO-"
+      );
+
+      summary.push(
+        `\n📊 Google Sheets:`,
+        `• Updated: ${sheetsSyncResults.successfulUpdates}`,
+        `• Skipped: ${sheetsSyncResults.skipped}`,
+        `• Errors: ${sheetsSyncResults.errors}`
+      );
+    } catch (sheetsError) {
+      console.error("[GoShow] Google Sheets sync error:", sheetsError);
+      summary.push(`\n⚠️ Google Sheets sync failed`);
+    }
+
+    summary.push(`\n⏰ Time: ${new Date().toISOString()}`);
+    await this.bot.api.sendMessage(chatId, summary.join("\n"));
 
     // Send detailed errors and skipped items if any
     const details = this.formatSyncDetails(syncResults.details);
@@ -938,15 +979,35 @@ export class TelegramBotService {
 
       const summary = [
         "✅ [Zygo] Sync completed!\n",
-        `📊 Results:`,
+        `📊 Monday.com:`,
         `• Processed: ${syncResults.totalProcessed}`,
         `• Successfully updated: ${syncResults.successfulUpdates}`,
         `• Skipped: ${syncResults.skipped}`,
         `• Errors: ${syncResults.errors}`,
-        `\n⏰ Time: ${new Date().toISOString()}`,
-      ].join("\n");
+      ];
 
-      await this.bot.api.sendMessage(chatId, summary);
+      // Google Sheets sync
+      try {
+        const sheetsService = GoogleSheetsService.getInstance();
+        const sheetsSyncResults = await sheetsService.syncActiveEvents(
+          activeEvents,
+          syncTimestamp,
+          "ZY-"
+        );
+
+        summary.push(
+          `\n📊 Google Sheets:`,
+          `• Updated: ${sheetsSyncResults.successfulUpdates}`,
+          `• Skipped: ${sheetsSyncResults.skipped}`,
+          `• Errors: ${sheetsSyncResults.errors}`
+        );
+      } catch (sheetsError) {
+        console.error("[Zygo] Google Sheets sync error:", sheetsError);
+        summary.push(`\n⚠️ Google Sheets sync failed`);
+      }
+
+      summary.push(`\n⏰ Time: ${new Date().toISOString()}`);
+      await this.bot.api.sendMessage(chatId, summary.join("\n"));
 
       // Send detailed errors and skipped items if any
       const details = this.formatSyncDetails(syncResults.details);
@@ -1012,15 +1073,35 @@ export class TelegramBotService {
 
     const summary = [
       "✅ [Eventim] Sync completed!\n",
-      `📊 Results:`,
+      `📊 Monday.com:`,
       `• Processed: ${syncResults.totalProcessed}`,
       `• Successfully updated: ${syncResults.successfulUpdates}`,
       `• Skipped: ${syncResults.skipped}`,
       `• Errors: ${syncResults.errors}`,
-      `\n⏰ Time: ${new Date().toISOString()}`,
-    ].join("\n");
+    ];
 
-    await this.bot.api.sendMessage(chatId, summary);
+    // Google Sheets sync
+    try {
+      const sheetsService = GoogleSheetsService.getInstance();
+      const sheetsSyncResults = await sheetsService.syncActiveEvents(
+        activeEvents,
+        syncTimestamp,
+        "ZAP-"
+      );
+
+      summary.push(
+        `\n📊 Google Sheets:`,
+        `• Updated: ${sheetsSyncResults.successfulUpdates}`,
+        `• Skipped: ${sheetsSyncResults.skipped}`,
+        `• Errors: ${sheetsSyncResults.errors}`
+      );
+    } catch (sheetsError) {
+      console.error("[Eventim] Google Sheets sync error:", sheetsError);
+      summary.push(`\n⚠️ Google Sheets sync failed`);
+    }
+
+    summary.push(`\n⏰ Time: ${new Date().toISOString()}`);
+    await this.bot.api.sendMessage(chatId, summary.join("\n"));
 
     // Send detailed errors and skipped items if any
     const details = this.formatSyncDetails(syncResults.details);
@@ -1103,15 +1184,35 @@ export class TelegramBotService {
 
       const summary = [
         "✅ [Eventim] Sync completed!\n",
-        `📊 Results:`,
+        `📊 Monday.com:`,
         `• Processed: ${syncResults.totalProcessed}`,
         `• Successfully updated: ${syncResults.successfulUpdates}`,
         `• Skipped: ${syncResults.skipped}`,
         `• Errors: ${syncResults.errors}`,
-        `\n⏰ Time: ${new Date().toISOString()}`,
-      ].join("\n");
+      ];
 
-      await this.bot.api.sendMessage(chatId, summary);
+      // Google Sheets sync
+      try {
+        const sheetsService = GoogleSheetsService.getInstance();
+        const sheetsSyncResults = await sheetsService.syncActiveEvents(
+          activeEvents,
+          syncTimestamp,
+          "ZAP-"
+        );
+
+        summary.push(
+          `\n📊 Google Sheets:`,
+          `• Updated: ${sheetsSyncResults.successfulUpdates}`,
+          `• Skipped: ${sheetsSyncResults.skipped}`,
+          `• Errors: ${sheetsSyncResults.errors}`
+        );
+      } catch (sheetsError) {
+        console.error("[Eventim] Google Sheets sync error:", sheetsError);
+        summary.push(`\n⚠️ Google Sheets sync failed`);
+      }
+
+      summary.push(`\n⏰ Time: ${new Date().toISOString()}`);
+      await this.bot.api.sendMessage(chatId, summary.join("\n"));
 
       // Send detailed errors and skipped items if any
       const details = this.formatSyncDetails(syncResults.details);

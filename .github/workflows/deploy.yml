@@ -73,6 +73,10 @@ jobs:
           # Optional: validate the .env file (remove sensitive output in production)
           echo "=== Environment file created with $(cat .env.production | wc -l) lines ==="
 
+      - name: Create Google Sheets credentials file
+        run: |
+          echo '${{ secrets.GOOGLE_SHEETS_CREDENTIALS_JSON }}' > credentials.json
+
       - name: Copy files to server
         uses: appleboy/scp-action@master
         with:
@@ -80,7 +84,7 @@ jobs:
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           port: 22
-          source: "docker-compose.yml,.env.production,scripts/setup-docker-cron.sh"
+          source: "docker-compose.yml,.env.production,scripts/setup-docker-cron.sh,credentials.json"
           target: "~/wordpress-parser"
 
       - name: Deploy to server

@@ -1,6 +1,7 @@
 import "dotenv/config";
 import { GoShowScraper } from "../core/goshow-scraper";
 import MondayService from "../api/services/monday.service";
+import GoogleSheetsService from "../services/google-sheets.service";
 import { TelegramNotificationService } from "../bot/services/telegram-notification.service";
 import { Event } from "../core/types";
 
@@ -139,7 +140,29 @@ async function main() {
     console.log("");
 
     // ========================================
-    // Phase 7: Exit with Appropriate Code
+    // Phase 7: Sync to Google Sheets
+    // ========================================
+    console.log("[GoShowSync] Phase 7: Starting sync to Google Sheets...");
+    try {
+      const sheetsService = GoogleSheetsService.getInstance();
+      const sheetsResult = await sheetsService.syncActiveEvents(
+        activeEvents,
+        syncTimestamp,
+        "GO-"
+      );
+
+      console.log("[GoShowSync] Google Sheets Sync Summary:");
+      console.log(`  Successful Updates:  ${sheetsResult.successfulUpdates}`);
+      console.log(`  Skipped:             ${sheetsResult.skipped}`);
+      console.log(`  Errors:              ${sheetsResult.errors}`);
+      console.log("─".repeat(60));
+      console.log("");
+    } catch (sheetsError) {
+      console.error("[GoShowSync] Google Sheets sync failed:", sheetsError);
+    }
+
+    // ========================================
+    // Phase 8: Exit with Appropriate Code
     // ========================================
     if (result.errors === result.totalProcessed && result.totalProcessed > 0) {
       console.log("[GoShowSync] All events failed. Exiting with error code.");

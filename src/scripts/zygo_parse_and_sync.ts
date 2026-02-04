@@ -1,6 +1,7 @@
 import "dotenv/config";
 import ZygoScraper from "../core/zygo-scraper";
 import MondayService from "../api/services/monday.service";
+import GoogleSheetsService from "../services/google-sheets.service";
 import { TelegramNotificationService } from "../bot/services/telegram-notification.service";
 import { Event } from "../core/types";
 import ZygoTokenService from "../services/zygo-token.service";
@@ -183,7 +184,29 @@ async function main() {
     console.log("");
 
     // ========================================
-    // Phase 8: Exit with Appropriate Code
+    // Phase 8: Sync to Google Sheets
+    // ========================================
+    console.log("[ZygoSync] Phase 8: Starting sync to Google Sheets...");
+    try {
+      const sheetsService = GoogleSheetsService.getInstance();
+      const sheetsResult = await sheetsService.syncActiveEvents(
+        activeEvents,
+        syncTimestamp,
+        "ZY-"
+      );
+
+      console.log("[ZygoSync] Google Sheets Sync Summary:");
+      console.log(`  Successful Updates:  ${sheetsResult.successfulUpdates}`);
+      console.log(`  Skipped:             ${sheetsResult.skipped}`);
+      console.log(`  Errors:              ${sheetsResult.errors}`);
+      console.log("─".repeat(60));
+      console.log("");
+    } catch (sheetsError) {
+      console.error("[ZygoSync] Google Sheets sync failed:", sheetsError);
+    }
+
+    // ========================================
+    // Phase 9: Exit with Appropriate Code
     // ========================================
     if (result.errors === result.totalProcessed && result.totalProcessed > 0) {
       console.log("[ZygoSync] All events failed. Exiting with error code.");

@@ -47,3 +47,9 @@ export class MondayApiError extends AppError {
         super(statusCode, message);
     }
 }
+
+export class GoogleSheetsApiError extends AppError {
+    constructor(message: string, statusCode: number = 500) {
+        super(statusCode, message);
+    }
+}
