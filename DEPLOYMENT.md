@@ -134,13 +134,10 @@ WP_USERNAME=your_admin_email@example.com
 WP_PASSWORD=your_secure_password
 TARGET_URL=https://ozentelaviv.com/wp-admin/
 
-# Monday.com Integration
-MONDAY_COM_API_KEY=your_monday_api_key_here
-MONDAY_COM_BOARD_ID=5086703491
-MONDAY_COM_EVENT_ID_COLUMN=text_mkxy6ra8
-MONDAY_COM_CAPACITY_COLUMN=numeric_mkxst6mx
-MONDAY_COM_TICKETS_SOLD_COLUMN=numeric_mkxsf3c8
-MONDAY_COM_UPDATE_DATE_COLUMN=date_mky2adca
+# Google Sheets Integration
+GOOGLE_SHEETS_SPREADSHEET_ID=your_spreadsheet_id
+GOOGLE_SHEETS_SHEET_NAME=Event_details
+GOOGLE_SHEETS_CREDENTIALS_PATH=/app/credentials.json
 
 # Telegram Bot
 TELEGRAM_BOT_TOKEN=1234567890:ABCdefGHIjklMNOpqrsTUVwxyz

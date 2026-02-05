@@ -42,12 +42,6 @@ export class ScraperError extends AppError {
     }
 }
 
-export class MondayApiError extends AppError {
-    constructor(message: string, statusCode: number = 500) {
-        super(statusCode, message);
-    }
-}
-
 export class GoogleSheetsApiError extends AppError {
     constructor(message: string, statusCode: number = 500) {
         super(statusCode, message);

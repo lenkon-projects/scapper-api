@@ -8,7 +8,6 @@ import { EventimScraper } from "../core/eventim-scraper";
 import { GoShowScraper } from "../core/goshow-scraper";
 import ZygoScraper from "../core/zygo-scraper";
 import { Event } from "../core/types";
-import MondayService from "../api/services/monday.service";
 import GoogleSheetsService from "../services/google-sheets.service";
 import ZygoTokenService from "../services/zygo-token.service";
 import axios from "axios";
@@ -145,11 +144,11 @@ export class TelegramBotService {
           `/status - Check bot status\n` +
           `/myid - Get your Telegram ID and token\n\n` +
           `*Event Management:*\n` +
-          `/parseandsync - Parse and sync events with Monday.com\n` +
+          `/parseandsync - Parse and sync events with Google Sheets\n` +
           `  • Ozen - Parse Ozen events\n` +
           `  • GoShow - Parse GoShow events\n` +
           `  • Zygo - Parse Zygo events\n` +
-          `/events - View events list from Monday.com\n\n` +
+          `/events - View events list from Google Sheets\n\n` +
           `*Authorization:*\n` +
           `/zygo_auth - Authorize Zygo account via SMS code\n\n` +
           `📎 *Eventim Reports:*\n` +
@@ -348,107 +347,43 @@ export class TelegramBotService {
         return;
       }
 
-      await ctx.reply("📋 Getting events list from Monday.com...");
+      await ctx.reply("📋 Getting events list from Google Sheets...");
 
       try {
-        const mondayService = MondayService.getInstance();
-        const items = await mondayService.getAllItems(50);
+        const sheetsService = GoogleSheetsService.getInstance();
+        const items = await sheetsService.getAllItems();
 
         if (items.length === 0) {
-          await ctx.reply("⚠️ No events found in Monday.com");
+          await ctx.reply("⚠️ No events found in Google Sheets");
           return;
         }
 
         // Format the events list as a table
-        let message = `📅 *Events in Monday.com* (${items.length} total)\n\n`;
+        let message = `📅 *Events in Google Sheets* (${items.length} total)\n\n`;
         message += "```\n";
         message +=
-          "№  | Event Name         | Event ID    | Sold/Cap | Updated\n";
+          "№  | Band Name          | Event ID    | Sold/Cap | Updated\n";
         message +=
           "---|--------------------|-----------  |----------|-------------------\n";
 
         items.forEach((item, index) => {
-          // Find Event ID column
-          const eventIdCol = item.column_values.find(
-            (col) =>
-              col.id === process.env.MONDAY_COM_EVENT_ID_COLUMN ||
-              col.id === "text_mkxy6ra8"
-          );
-
-          // Find Tickets Sold column
-          const ticketsSoldCol = item.column_values.find(
-            (col) =>
-              col.id === process.env.MONDAY_COM_TICKETS_SOLD_COLUMN ||
-              col.id === "numeric_mkxsf3c8"
-          );
-
-          // Find Capacity column
-          const capacityCol = item.column_values.find(
-            (col) =>
-              col.id === process.env.MONDAY_COM_CAPACITY_COLUMN ||
-              col.id === "numeric_mkxst6mx"
-          );
-
-          // Find Update Date column
-          const updateDateCol = item.column_values.find(
-            (col) =>
-              col.id === process.env.MONDAY_COM_UPDATE_DATE_COLUMN ||
-              col.id === "date_mky2adca"
-          );
-
-          const eventId = eventIdCol?.text || "N/A";
-          const ticketsSold = ticketsSoldCol?.text || "0";
-          const capacity = capacityCol?.text || "0";
-
-          // Parse Update Date from value JSON (date + time are in UTC)
-          let formattedDateTime = "N/A";
-          if (updateDateCol?.value) {
-            try {
-              const parsed = JSON.parse(updateDateCol.value);
-              if (parsed.date && parsed.time) {
-                // Combine date and time as UTC (add Z suffix)
-                const isoString = `${parsed.date}T${parsed.time}Z`;
-                const dateTime = new Date(isoString);
-
-                // Convert to Jerusalem timezone
-                const formatter = new Intl.DateTimeFormat("en-GB", {
-                  timeZone: "Asia/Jerusalem",
-                  day: "2-digit",
-                  month: "2-digit",
-                  hour: "2-digit",
-                  minute: "2-digit",
-                  hour12: false,
-                });
-
-                const parts = formatter.formatToParts(dateTime);
-                const day = parts.find((p) => p.type === "day")?.value || "00";
-                const month =
-                  parts.find((p) => p.type === "month")?.value || "00";
-                const hour =
-                  parts.find((p) => p.type === "hour")?.value || "00";
-                const minute =
-                  parts.find((p) => p.type === "minute")?.value || "00";
-
-                formattedDateTime = `${day}.${month} ${hour}:${minute} IL`;
-              }
-            } catch (e) {
-              // If parsing fails, fallback to N/A
-              formattedDateTime = "N/A";
-            }
-          }
+          const eventId = item.eventId || "N/A";
+          const ticketsSold = String(item.totalTicketsSold || 0);
+          const capacity = String(item.capacity || 0);
+          const lastUpdated = item.lastSnapshotAt || "N/A";
 
           // Truncate name if too long
           const name =
-            item.name.length > 18
-              ? item.name.substring(0, 15) + "..."
-              : item.name;
+            item.bandName.length > 18
+              ? item.bandName.substring(0, 15) + "..."
+              : item.bandName;
 
           // Format row with padding
           const num = String(index + 1).padStart(2, " ");
-          const namePad = name.padEnd(18, " ");
+          const namePad = (name || "N/A").padEnd(18, " ");
           const idPad = eventId.padEnd(11, " ");
           const tickets = `${ticketsSold}/${capacity}`.padEnd(8, " ");
-          const datePad = formattedDateTime.padEnd(17, " ");
+          const datePad = lastUpdated.padEnd(17, " ");
 
           message += `${num} | ${namePad} | ${idPad} | ${tickets} | ${datePad}\n`;
 
@@ -694,7 +629,7 @@ export class TelegramBotService {
       eventId?: string;
       status: string;
       message?: string;
-      mondayItemId?: string;
+      rowIndex?: number;
     }>
   ): string | null {
     const errors = details.filter((d) => d.status === "error");
@@ -756,12 +691,12 @@ export class TelegramBotService {
 
     await this.bot.api.sendMessage(
       chatId,
-      "🔄 [Ozen] Starting sync with Monday.com..."
+      "🔄 [Ozen] Starting sync with Google Sheets..."
     );
 
-    const mondayService = MondayService.getInstance();
+    const sheetsService = GoogleSheetsService.getInstance();
     const syncTimestamp = new Date();
-    const syncResults = await mondayService.syncActiveEvents(
+    const syncResults = await sheetsService.syncActiveEvents(
       activeEvents,
       syncTimestamp,
       "OZ-"
@@ -769,32 +704,12 @@ export class TelegramBotService {
 
     const summary = [
       "✅ [Ozen] Sync completed!\n",
-      `📊 Monday.com:`,
+      `📊 Google Sheets:`,
       `• Processed: ${syncResults.totalProcessed}`,
       `• Successfully updated: ${syncResults.successfulUpdates}`,
       `• Skipped: ${syncResults.skipped}`,
       `• Errors: ${syncResults.errors}`,
     ];
-
-    // Google Sheets sync
-    try {
-      const sheetsService = GoogleSheetsService.getInstance();
-      const sheetsSyncResults = await sheetsService.syncActiveEvents(
-        activeEvents,
-        syncTimestamp,
-        "OZ-"
-      );
-
-      summary.push(
-        `\n📊 Google Sheets:`,
-        `• Updated: ${sheetsSyncResults.successfulUpdates}`,
-        `• Skipped: ${sheetsSyncResults.skipped}`,
-        `• Errors: ${sheetsSyncResults.errors}`
-      );
-    } catch (sheetsError) {
-      console.error("[Ozen] Google Sheets sync error:", sheetsError);
-      summary.push(`\n⚠️ Google Sheets sync failed`);
-    }
 
     summary.push(`\n⏰ Time: ${new Date().toISOString()}`);
     await this.bot.api.sendMessage(chatId, summary.join("\n"));
@@ -846,12 +761,12 @@ export class TelegramBotService {
 
     await this.bot.api.sendMessage(
       chatId,
-      "🔄 [GoShow] Starting sync with Monday.com..."
+      "🔄 [GoShow] Starting sync with Google Sheets..."
     );
 
-    const mondayService = MondayService.getInstance();
+    const sheetsService = GoogleSheetsService.getInstance();
     const syncTimestamp = new Date();
-    const syncResults = await mondayService.syncActiveEvents(
+    const syncResults = await sheetsService.syncActiveEvents(
       activeEvents,
       syncTimestamp,
       "GO-"
@@ -859,32 +774,12 @@ export class TelegramBotService {
 
     const summary = [
       "✅ [GoShow] Sync completed!\n",
-      `📊 Monday.com:`,
+      `📊 Google Sheets:`,
       `• Processed: ${syncResults.totalProcessed}`,
       `• Successfully updated: ${syncResults.successfulUpdates}`,
       `• Skipped: ${syncResults.skipped}`,
       `• Errors: ${syncResults.errors}`,
     ];
-
-    // Google Sheets sync
-    try {
-      const sheetsService = GoogleSheetsService.getInstance();
-      const sheetsSyncResults = await sheetsService.syncActiveEvents(
-        activeEvents,
-        syncTimestamp,
-        "GO-"
-      );
-
-      summary.push(
-        `\n📊 Google Sheets:`,
-        `• Updated: ${sheetsSyncResults.successfulUpdates}`,
-        `• Skipped: ${sheetsSyncResults.skipped}`,
-        `• Errors: ${sheetsSyncResults.errors}`
-      );
-    } catch (sheetsError) {
-      console.error("[GoShow] Google Sheets sync error:", sheetsError);
-      summary.push(`\n⚠️ Google Sheets sync failed`);
-    }
 
     summary.push(`\n⏰ Time: ${new Date().toISOString()}`);
     await this.bot.api.sendMessage(chatId, summary.join("\n"));
@@ -941,13 +836,12 @@ export class TelegramBotService {
       const now = new Date();
       const upcomingEvents = events.filter((e) => new Date(e.startDate) > now);
 
-      // Convert to Event format for Monday.com
+      // Convert to Event format for sync
       const activeEvents: Event[] = upcomingEvents.map((e) => ({
         active: true,
         eventId: e.identifier,
         ticketsSold: {
-          total: e.analytics?.approved || 0, // Use actual number of sold tickets
-          // capacity is NOT passed - filled in Monday.com manually
+          total: e.analytics?.approved || 0,
         },
       }));
 
@@ -966,12 +860,12 @@ export class TelegramBotService {
 
       await this.bot.api.sendMessage(
         chatId,
-        "🔄 [Zygo] Starting sync with Monday.com..."
+        "🔄 [Zygo] Starting sync with Google Sheets..."
       );
 
-      const mondayService = MondayService.getInstance();
+      const sheetsService = GoogleSheetsService.getInstance();
       const syncTimestamp = new Date();
-      const syncResults = await mondayService.syncActiveEvents(
+      const syncResults = await sheetsService.syncActiveEvents(
         activeEvents,
         syncTimestamp,
         "ZY-"
@@ -979,32 +873,12 @@ export class TelegramBotService {
 
       const summary = [
         "✅ [Zygo] Sync completed!\n",
-        `📊 Monday.com:`,
+        `📊 Google Sheets:`,
         `• Processed: ${syncResults.totalProcessed}`,
         `• Successfully updated: ${syncResults.successfulUpdates}`,
         `• Skipped: ${syncResults.skipped}`,
         `• Errors: ${syncResults.errors}`,
       ];
-
-      // Google Sheets sync
-      try {
-        const sheetsService = GoogleSheetsService.getInstance();
-        const sheetsSyncResults = await sheetsService.syncActiveEvents(
-          activeEvents,
-          syncTimestamp,
-          "ZY-"
-        );
-
-        summary.push(
-          `\n📊 Google Sheets:`,
-          `• Updated: ${sheetsSyncResults.successfulUpdates}`,
-          `• Skipped: ${sheetsSyncResults.skipped}`,
-          `• Errors: ${sheetsSyncResults.errors}`
-        );
-      } catch (sheetsError) {
-        console.error("[Zygo] Google Sheets sync error:", sheetsError);
-        summary.push(`\n⚠️ Google Sheets sync failed`);
-      }
 
       summary.push(`\n⏰ Time: ${new Date().toISOString()}`);
       await this.bot.api.sendMessage(chatId, summary.join("\n"));
@@ -1060,12 +934,12 @@ export class TelegramBotService {
 
     await this.bot.api.sendMessage(
       chatId,
-      "🔄 [Eventim] Starting sync with Monday.com..."
+      "🔄 [Eventim] Starting sync with Google Sheets..."
     );
 
-    const mondayService = MondayService.getInstance();
+    const sheetsService = GoogleSheetsService.getInstance();
     const syncTimestamp = new Date();
-    const syncResults = await mondayService.syncActiveEvents(
+    const syncResults = await sheetsService.syncActiveEvents(
       activeEvents,
       syncTimestamp,
       "ZAP-"
@@ -1073,32 +947,12 @@ export class TelegramBotService {
 
     const summary = [
       "✅ [Eventim] Sync completed!\n",
-      `📊 Monday.com:`,
+      `📊 Google Sheets:`,
       `• Processed: ${syncResults.totalProcessed}`,
       `• Successfully updated: ${syncResults.successfulUpdates}`,
       `• Skipped: ${syncResults.skipped}`,
       `• Errors: ${syncResults.errors}`,
     ];
-
-    // Google Sheets sync
-    try {
-      const sheetsService = GoogleSheetsService.getInstance();
-      const sheetsSyncResults = await sheetsService.syncActiveEvents(
-        activeEvents,
-        syncTimestamp,
-        "ZAP-"
-      );
-
-      summary.push(
-        `\n📊 Google Sheets:`,
-        `• Updated: ${sheetsSyncResults.successfulUpdates}`,
-        `• Skipped: ${sheetsSyncResults.skipped}`,
-        `• Errors: ${sheetsSyncResults.errors}`
-      );
-    } catch (sheetsError) {
-      console.error("[Eventim] Google Sheets sync error:", sheetsError);
-      summary.push(`\n⚠️ Google Sheets sync failed`);
-    }
 
     summary.push(`\n⏰ Time: ${new Date().toISOString()}`);
     await this.bot.api.sendMessage(chatId, summary.join("\n"));
@@ -1171,12 +1025,12 @@ export class TelegramBotService {
 
       await this.bot.api.sendMessage(
         chatId,
-        "🔄 [Eventim] Starting sync with Monday.com..."
+        "🔄 [Eventim] Starting sync with Google Sheets..."
       );
 
-      const mondayService = MondayService.getInstance();
+      const sheetsService = GoogleSheetsService.getInstance();
       const syncTimestamp = new Date();
-      const syncResults = await mondayService.syncActiveEvents(
+      const syncResults = await sheetsService.syncActiveEvents(
         activeEvents,
         syncTimestamp,
         "ZAP-"
@@ -1184,32 +1038,12 @@ export class TelegramBotService {
 
       const summary = [
         "✅ [Eventim] Sync completed!\n",
-        `📊 Monday.com:`,
+        `📊 Google Sheets:`,
         `• Processed: ${syncResults.totalProcessed}`,
         `• Successfully updated: ${syncResults.successfulUpdates}`,
         `• Skipped: ${syncResults.skipped}`,
         `• Errors: ${syncResults.errors}`,
       ];
-
-      // Google Sheets sync
-      try {
-        const sheetsService = GoogleSheetsService.getInstance();
-        const sheetsSyncResults = await sheetsService.syncActiveEvents(
-          activeEvents,
-          syncTimestamp,
-          "ZAP-"
-        );
-
-        summary.push(
-          `\n📊 Google Sheets:`,
-          `• Updated: ${sheetsSyncResults.successfulUpdates}`,
-          `• Skipped: ${sheetsSyncResults.skipped}`,
-          `• Errors: ${sheetsSyncResults.errors}`
-        );
-      } catch (sheetsError) {
-        console.error("[Eventim] Google Sheets sync error:", sheetsError);
-        summary.push(`\n⚠️ Google Sheets sync failed`);
-      }
 
       summary.push(`\n⏰ Time: ${new Date().toISOString()}`);
       await this.bot.api.sendMessage(chatId, summary.join("\n"));

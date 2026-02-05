@@ -1,6 +1,6 @@
 # WordPress Events Management Platform
 
-A comprehensive event management platform that automates WordPress event ticket scraping, provides REST API access, Telegram bot notifications, and Monday.com project management integration with Docker deployment.
+A comprehensive event management platform that automates WordPress event ticket scraping, provides REST API access, Telegram bot notifications, and Google Sheets synchronization with Docker deployment.
 
 ## Architecture Overview
 
@@ -8,7 +8,7 @@ This is a multi-service platform with the following components:
 
 - **🌐 REST API Server** - Express.js API with job queue system and Swagger documentation
 - **🤖 Telegram Bot** - Automated notifications and command interface with user authentication
-- **📊 Monday.com Integration** - Automatic project board synchronization with ticket data
+- **📊 Google Sheets Integration** - Automatic spreadsheet synchronization with ticket data
 - **🔍 WordPress Scraper** - Puppeteer-based parser with bot protection bypass
 - **🐳 Docker Deployment** - Production-ready containerized deployment with nginx
 
@@ -55,7 +55,7 @@ npm run start:all:prod
 - **Docker & Docker Compose** (for production)
 - **TypeScript** (for development)
 - **WordPress Admin Access** (for parsing)
-- **Monday.com API Access** (for sync)
+- **Google Sheets API Access** (for sync)
 - **Telegram Bot Token** (for notifications)
 
 ## Key Features
@@ -85,10 +85,10 @@ npm run start:all:prod
 - Screenshot verification
 - Timestamped JSON output
 
-### Monday.com Integration
+### Google Sheets Integration
 
-- Automatic board item synchronization
-- Event ID mapping with "OZ-" prefix
+- Automatic spreadsheet synchronization
+- Event ID mapping with prefixes (OZ-, ZY-, GO-, ZAP-)
 - Capacity and ticket sales tracking
 - Update timestamp logging
 - Comprehensive error handling
@@ -105,15 +105,11 @@ npm run start:all:prod
 
 ```bash
 # Parse and sync in one operation
-npm run parse:sync:dev
-npm run parse:sync:prod
+npm run ozen:sync:dev
+npm run ozen:sync:prod
 
-# Monday.com sync only
-npm run sync:monday:dev
-npm run sync:monday:prod
-
-# Test Monday.com integration
-npm run test:monday
+# Test Google Sheets integration
+npm run test:sheets
 
 # Build for production
 npm run build
@@ -136,13 +132,10 @@ WP_USERNAME=your_username
 WP_PASSWORD=your_password
 TARGET_URL=https://site.com/wp-admin/
 
-# Monday.com Integration
-MONDAY_COM_API_KEY=your_monday_api_key
-MONDAY_COM_BOARD_ID=your_board_id
-MONDAY_COM_EVENT_ID_COLUMN=text_column_id
-MONDAY_COM_CAPACITY_COLUMN=numeric_column_id
-MONDAY_COM_TICKETS_SOLD_COLUMN=numeric_column_id
-MONDAY_COM_UPDATE_DATE_COLUMN=date_column_id
+# Google Sheets Integration
+GOOGLE_SHEETS_SPREADSHEET_ID=your_spreadsheet_id
+GOOGLE_SHEETS_SHEET_NAME=Event_details
+GOOGLE_SHEETS_CREDENTIALS_PATH=/app/credentials.json
 
 # Telegram Bot
 TELEGRAM_BOT_TOKEN=your_bot_token
@@ -162,7 +155,7 @@ RATE_LIMIT_MAX_REQUESTS=10
 
 1. **WordPress Parsing** → Extract event data (ID, tickets sold, capacity, status)
 2. **JSON Storage** → Save timestamped files to `./output/events_[timestamp].json`
-3. **Monday.com Sync** → Update project board with latest ticket data
+3. **Google Sheets Sync** → Update spreadsheet with latest ticket data
 4. **Telegram Notifications** → Send real-time updates to authorized users
 5. **API Access** → Provide REST endpoints for external integrations
 
@@ -185,9 +178,10 @@ src/
 │   ├── types.ts            # TypeScript interfaces
 │   └── utils.ts            # Helper functions
 ├── scripts/                 # Standalone utilities
-│   ├── parse_and_sync.ts   # Combined parse + Monday sync
-│   ├── sync_monday.ts      # Monday.com sync only
-│   └── test_monday_items.ts # Monday.com testing
+│   ├── ozen_parse_and_sync.ts    # Ozen parse + Google Sheets sync
+│   ├── zygo_parse_and_sync.ts    # Zygo parse + Google Sheets sync
+│   ├── eventim_parse_and_sync.ts # Eventim parse + Google Sheets sync
+│   └── goshow_parse_and_sync.ts  # GoShow parse + Google Sheets sync
 └── start.ts                # Multi-service startup
 ```
 
