@@ -71,7 +71,7 @@ const options: swaggerJsdoc.Options = {
             },
             {
                 name: 'Eventim',
-                description: 'Eventim report parsing and Monday.com sync endpoints',
+                description: 'Eventim report parsing and Google Sheets sync endpoints',
             },
         ],
     },

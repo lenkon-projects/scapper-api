@@ -1,6 +1,5 @@
 import "dotenv/config";
 import ZygoScraper from "../core/zygo-scraper";
-import MondayService from "../api/services/monday.service";
 import GoogleSheetsService from "../services/google-sheets.service";
 import { TelegramNotificationService } from "../bot/services/telegram-notification.service";
 import { Event } from "../core/types";
@@ -10,13 +9,13 @@ import ZygoTokenService from "../services/zygo-token.service";
  * Zygo Parse & Sync Script
  *
  * Executes Zygo API parsing,
- * then syncs parsed events to Monday.com board.
+ * then syncs parsed events to Google Sheets.
  *
  * Features:
  * - Zygo API scraping (no browser required)
  * - Filters only upcoming events
- * - Converts Zygo events to Monday.com format
- * - Syncs to Monday.com with timestamp
+ * - Converts Zygo events to sync format
+ * - Syncs to Google Sheets with timestamp
  * - Comprehensive logging throughout
  * - Error notifications via Telegram
  * - Proper error handling with exit codes
@@ -103,10 +102,10 @@ async function main() {
     }
 
     // ========================================
-    // Phase 3: Convert Events to Monday.com Format
+    // Phase 3: Convert Events to Sync Format
     // ========================================
     console.log(
-      "[ZygoSync] Phase 3: Converting events to Monday.com format..."
+      "[ZygoSync] Phase 3: Converting events to sync format..."
     );
 
     // All upcoming Zygo managed events with analytics
@@ -114,8 +113,7 @@ async function main() {
       active: true,
       eventId: e.identifier,
       ticketsSold: {
-        total: e.analytics?.approved || 0, // Реальное количество проданных билетов
-        // capacity НЕ передаётся - заполняется в Monday.com вручную
+        total: e.analytics?.approved || 0,
       },
     }));
 
@@ -123,59 +121,28 @@ async function main() {
     console.log("");
 
     // ========================================
-    // Phase 4: Initialize Monday.com Service
-    // ========================================
-    console.log("[ZygoSync] Phase 4: Initializing Monday.com service...");
-    const mondayService = MondayService.getInstance();
-
-    // ========================================
-    // Phase 5: Sync to Monday.com
+    // Phase 4: Sync to Google Sheets
     // ========================================
     const syncTimestamp = new Date();
-    console.log("[ZygoSync] Phase 5: Starting sync to Monday.com...");
+    console.log("[ZygoSync] Phase 4: Starting sync to Google Sheets...");
     console.log(
       `[ZygoSync] Using sync timestamp: ${syncTimestamp.toISOString()}`
     );
     console.log("");
 
-    // Use ZY- prefix for Zygo events
-    const result = await mondayService.syncActiveEvents(
+    const sheetsService = GoogleSheetsService.getInstance();
+    const result = await sheetsService.syncActiveEvents(
       activeEvents,
       syncTimestamp,
       "ZY-"
     );
 
     // ========================================
-    // Phase 6: Log Detailed Results
-    // ========================================
-    console.log("");
-    console.log("[ZygoSync] Sync Details:");
-    console.log("─".repeat(60));
-
-    for (const detail of result.details) {
-      const eventId = detail.eventId?.padEnd(15) || "unknown".padEnd(15);
-
-      switch (detail.status) {
-        case "updated":
-          console.log(
-            `[ZygoSync] ✓ ${eventId} - Updated (Item: ${detail.mondayItemId})`
-          );
-          break;
-        case "skipped":
-          console.log(`[ZygoSync] ⚠ ${eventId} - Skipped: ${detail.message}`);
-          break;
-        case "error":
-          console.log(`[ZygoSync] ✗ ${eventId} - Error: ${detail.message}`);
-          break;
-      }
-    }
-
-    // ========================================
-    // Phase 7: Log Summary
+    // Phase 5: Log Summary
     // ========================================
     console.log("");
     console.log("─".repeat(60));
-    console.log("[ZygoSync] Summary:");
+    console.log("[ZygoSync] Google Sheets Sync Summary:");
     console.log(`  Total Processed:     ${result.totalProcessed}`);
     console.log(`  Successful Updates:  ${result.successfulUpdates}`);
     console.log(`  Skipped:             ${result.skipped}`);
@@ -184,29 +151,7 @@ async function main() {
     console.log("");
 
     // ========================================
-    // Phase 8: Sync to Google Sheets
-    // ========================================
-    console.log("[ZygoSync] Phase 8: Starting sync to Google Sheets...");
-    try {
-      const sheetsService = GoogleSheetsService.getInstance();
-      const sheetsResult = await sheetsService.syncActiveEvents(
-        activeEvents,
-        syncTimestamp,
-        "ZY-"
-      );
-
-      console.log("[ZygoSync] Google Sheets Sync Summary:");
-      console.log(`  Successful Updates:  ${sheetsResult.successfulUpdates}`);
-      console.log(`  Skipped:             ${sheetsResult.skipped}`);
-      console.log(`  Errors:              ${sheetsResult.errors}`);
-      console.log("─".repeat(60));
-      console.log("");
-    } catch (sheetsError) {
-      console.error("[ZygoSync] Google Sheets sync failed:", sheetsError);
-    }
-
-    // ========================================
-    // Phase 9: Exit with Appropriate Code
+    // Phase 6: Exit with Appropriate Code
     // ========================================
     if (result.errors === result.totalProcessed && result.totalProcessed > 0) {
       console.log("[ZygoSync] All events failed. Exiting with error code.");

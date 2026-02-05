@@ -7,10 +7,10 @@ const router = Router();
  * @swagger
  * /api/eventim/parse-and-sync:
  *   post:
- *     summary: Parse Eventim HTML report and sync with Monday.com
+ *     summary: Parse Eventim HTML report and sync with Google Sheets
  *     description: |
  *       Synchronously parses an Eventim static HTML report, checks freshness against
- *       previously processed reports, extracts event data, and syncs with Monday.com.
+ *       previously processed reports, extracts event data, and syncs with Google Sheets.
  *       Returns comprehensive results including parsed events, file paths, and sync status.
  *     tags: [Eventim]
  *     security:
@@ -109,7 +109,7 @@ const router = Router();
  *                       example: 5420
  *                 sync:
  *                   type: object
- *                   description: Monday.com sync results (only present if not skipped)
+ *                   description: Google Sheets sync results (only present if not skipped)
  *                   properties:
  *                     totalProcessed:
  *                       type: integer
@@ -137,9 +137,9 @@ const router = Router();
  *                             example: 'updated'
  *                           message:
  *                             type: string
- *                           mondayItemId:
- *                             type: string
- *                             example: '7891234567'
+ *                           rowIndex:
+ *                             type: integer
+ *                             example: 5
  *       400:
  *         description: Invalid request (missing or invalid URL)
  *         content:

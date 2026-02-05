@@ -1,6 +1,6 @@
 # Telegram Bot Documentation
 
-The WordPress Events Management Platform includes a comprehensive Telegram bot that provides real-time notifications, command interface, and secure user authentication for managing event parsing and Monday.com synchronization.
+The WordPress Events Management Platform includes a comprehensive Telegram bot that provides real-time notifications, command interface, and secure user authentication for managing event parsing and Google Sheets synchronization.
 
 ## Overview
 
@@ -120,7 +120,7 @@ Shows all available commands with descriptions.
 /help - Show this message
 /status - Check bot status
 /myid - Get your Telegram ID
-/parseandsync - Run parsing and synchronization with Monday.com
+/parseandsync - Run parsing and synchronization with Google Sheets
 /events - Get events list
 ```
 
@@ -168,7 +168,7 @@ Display your Telegram ID and access status.
 
 ### `/parseandsync` - Parse and Sync Events
 
-**⚠️ Main Command** - Triggers complete parsing and Monday.com synchronization workflow.
+**⚠️ Main Command** - Triggers complete parsing and Google Sheets synchronization workflow.
 
 **Usage:**
 
@@ -201,10 +201,10 @@ This may take some time.
 🔍 Found active events: 12 out of 25
 ```
 
-**Step 4: Monday.com Sync**
+**Step 4: Google Sheets Sync**
 
 ```
-🔄 Starting synchronization with Monday.com...
+🔄 Starting synchronization with Google Sheets...
 ```
 
 **Step 5: Final Results**
@@ -304,12 +304,12 @@ The bot automatically tracks user interactions for notification delivery:
 Please check WordPress credentials in configuration.
 ```
 
-**Monday.com API Error:**
+**Google Sheets API Error:**
 
 ```
-❌ Error: Monday.com API error: Invalid API key
+❌ Error: Google Sheets API error: Invalid credentials
 
-Please verify Monday.com configuration.
+Please verify Google Sheets configuration.
 ```
 
 **Parse Timeout:**
@@ -325,7 +325,7 @@ The WordPress site may be slow or unreachable.
 ```
 ⚠️ No active events for synchronization
 
-Parse completed but found no events to sync with Monday.com.
+Parse completed but found no events to sync with Google Sheets.
 ```
 
 ### Error Reporting
@@ -353,7 +353,7 @@ await TelegramNotificationService.getInstance().sendToAllUsers(
 ### Notification Types
 
 1. **Parse Completion** - When parsing finishes
-2. **Sync Results** - Monday.com synchronization status
+2. **Sync Results** - Google Sheets synchronization status
 3. **Error Alerts** - Critical system errors
 4. **Status Updates** - System maintenance or changes
 
@@ -435,15 +435,15 @@ const parseResult = await executeParse({
 });
 ```
 
-### Monday.com Service Integration
+### Google Sheets Service Integration
 
-Automatic synchronization with Monday.com:
+Automatic synchronization with Google Sheets:
 
 ```typescript
-import MondayService from "../api/services/monday.service";
+import GoogleSheetsService from "../services/google-sheets.service";
 
-const mondayService = MondayService.getInstance();
-const syncResult = await mondayService.syncActiveEvents(events, timestamp);
+const sheetsService = GoogleSheetsService.getInstance();
+const syncResult = await sheetsService.syncActiveEvents(events, timestamp, "OZ-");
 ```
 
 ### Notification Integration
@@ -606,11 +606,11 @@ curl -X GET "https://api.telegram.org/bot<your-token>/getMe"
 - Check WordPress site accessibility
 - Test manual login to WordPress admin
 
-**Monday.com Integration:**
+**Google Sheets Integration:**
 
-- Verify Monday.com API key
-- Check board ID and column IDs
-- Test Monday.com API connectivity
+- Verify Google Sheets credentials file
+- Check spreadsheet ID and sheet name
+- Test Google Sheets API connectivity
 
 ### Logging & Debugging
 

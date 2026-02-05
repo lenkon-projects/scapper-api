@@ -1,6 +1,5 @@
 import "dotenv/config";
 import { GoShowScraper } from "../core/goshow-scraper";
-import MondayService from "../api/services/monday.service";
 import GoogleSheetsService from "../services/google-sheets.service";
 import { TelegramNotificationService } from "../bot/services/telegram-notification.service";
 import { Event } from "../core/types";
@@ -9,13 +8,13 @@ import { Event } from "../core/types";
  * GoShow Parse & Sync Script
  *
  * Executes GoShow Manager parsing,
- * then syncs parsed events to Monday.com board.
+ * then syncs parsed events to Google Sheets.
  *
  * Features:
  * - GoShow Manager scraping with headless mode
  * - Automatic browser cleanup
- * - Converts GoShow events to Monday.com format
- * - Syncs to Monday.com with timestamp
+ * - Converts GoShow events to sync format
+ * - Syncs to Google Sheets with timestamp
  * - Comprehensive logging throughout
  * - Error notifications via Telegram
  * - Proper error handling with exit codes
@@ -53,10 +52,10 @@ async function main() {
     console.log("");
 
     // ========================================
-    // Phase 2: Convert Events to Monday.com Format
+    // Phase 2: Convert Events to Sync Format
     // ========================================
     console.log(
-      "[GoShowSync] Phase 2: Converting events to Monday.com format..."
+      "[GoShowSync] Phase 2: Converting events to sync format..."
     );
 
     // All GoShow events are considered active
@@ -79,59 +78,28 @@ async function main() {
     console.log("");
 
     // ========================================
-    // Phase 3: Initialize Monday.com Service
-    // ========================================
-    console.log("[GoShowSync] Phase 3: Initializing Monday.com service...");
-    const mondayService = MondayService.getInstance();
-
-    // ========================================
-    // Phase 4: Sync to Monday.com
+    // Phase 3: Sync to Google Sheets
     // ========================================
     const syncTimestamp = new Date();
-    console.log("[GoShowSync] Phase 4: Starting sync to Monday.com...");
+    console.log("[GoShowSync] Phase 3: Starting sync to Google Sheets...");
     console.log(
       `[GoShowSync] Using sync timestamp: ${syncTimestamp.toISOString()}`
     );
     console.log("");
 
-    // Use GO- prefix for GoShow events
-    const result = await mondayService.syncActiveEvents(
+    const sheetsService = GoogleSheetsService.getInstance();
+    const result = await sheetsService.syncActiveEvents(
       activeEvents,
       syncTimestamp,
       "GO-"
     );
 
     // ========================================
-    // Phase 5: Log Detailed Results
-    // ========================================
-    console.log("");
-    console.log("[GoShowSync] Sync Details:");
-    console.log("─".repeat(60));
-
-    for (const detail of result.details) {
-      const eventId = detail.eventId?.padEnd(10) || "unknown".padEnd(10);
-
-      switch (detail.status) {
-        case "updated":
-          console.log(
-            `[GoShowSync] ✓ ${eventId} - Updated (Item: ${detail.mondayItemId})`
-          );
-          break;
-        case "skipped":
-          console.log(`[GoShowSync] ⚠ ${eventId} - Skipped: ${detail.message}`);
-          break;
-        case "error":
-          console.log(`[GoShowSync] ✗ ${eventId} - Error: ${detail.message}`);
-          break;
-      }
-    }
-
-    // ========================================
-    // Phase 6: Log Summary
+    // Phase 4: Log Summary
     // ========================================
     console.log("");
     console.log("─".repeat(60));
-    console.log("[GoShowSync] Summary:");
+    console.log("[GoShowSync] Google Sheets Sync Summary:");
     console.log(`  Total Processed:     ${result.totalProcessed}`);
     console.log(`  Successful Updates:  ${result.successfulUpdates}`);
     console.log(`  Skipped:             ${result.skipped}`);
@@ -140,29 +108,7 @@ async function main() {
     console.log("");
 
     // ========================================
-    // Phase 7: Sync to Google Sheets
-    // ========================================
-    console.log("[GoShowSync] Phase 7: Starting sync to Google Sheets...");
-    try {
-      const sheetsService = GoogleSheetsService.getInstance();
-      const sheetsResult = await sheetsService.syncActiveEvents(
-        activeEvents,
-        syncTimestamp,
-        "GO-"
-      );
-
-      console.log("[GoShowSync] Google Sheets Sync Summary:");
-      console.log(`  Successful Updates:  ${sheetsResult.successfulUpdates}`);
-      console.log(`  Skipped:             ${sheetsResult.skipped}`);
-      console.log(`  Errors:              ${sheetsResult.errors}`);
-      console.log("─".repeat(60));
-      console.log("");
-    } catch (sheetsError) {
-      console.error("[GoShowSync] Google Sheets sync failed:", sheetsError);
-    }
-
-    // ========================================
-    // Phase 8: Exit with Appropriate Code
+    // Phase 5: Exit with Appropriate Code
     // ========================================
     if (result.errors === result.totalProcessed && result.totalProcessed > 0) {
       console.log("[GoShowSync] All events failed. Exiting with error code.");

@@ -1,5 +1,4 @@
 import { EventimEvent } from '../../core/eventim.types';
-import { SyncResult } from './monday.types';
 import { SheetSyncResult } from './google-sheets.types';
 
 /**
@@ -11,7 +10,7 @@ export interface EventimParseAndSyncRequest {
 
 /**
  * Response for POST /api/eventim/parse-and-sync
- * Includes parsing information, file paths, metadata, and Monday.com sync results
+ * Includes parsing information, file paths, metadata, and Google Sheets sync results
  */
 export interface EventimParseAndSyncResponse {
   /**
@@ -75,12 +74,7 @@ export interface EventimParseAndSyncResponse {
   };
 
   /**
-   * Monday.com sync results (only present if not skipped)
-   */
-  sync?: SyncResult;
-
-  /**
    * Google Sheets sync results (only present if not skipped)
    */
-  sheetsSync?: SheetSyncResult;
+  sync?: SheetSyncResult;
 }
