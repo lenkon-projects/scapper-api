@@ -63,7 +63,7 @@ class GoogleSheetsService {
     try {
       const response = await this.sheets.spreadsheets.values.get({
         spreadsheetId: this.config.spreadsheetId,
-        range: `${this.config.sheetName}!A2:I`,
+        range: `${this.config.sheetName}!A2:J`,
       });
 
       const rows = response.data.values || [];
@@ -77,6 +77,7 @@ class GoogleSheetsService {
         capacity: parseInt(row[4]) || 0,
         totalTicketsSold: parseInt(row[5]) || 0,
         lastSnapshotAt: row[6] || "",
+        unixTimestamp: parseInt(row[9]) || 0,
         eventStatus: row[7] || "",
         eventFullName: row[8] || "",
       }));
@@ -114,22 +115,30 @@ class GoogleSheetsService {
     timestamp: Date
   ): Promise<boolean> {
     const dateStr = this.formatDate(timestamp);
+    const unixTimestamp = Math.floor(timestamp.getTime() / 1000);
 
-    const range = `${this.config.sheetName}!E${rowIndex}:G${rowIndex}`;
-    const values = [
-      [
-        event.ticketsSold?.capacity || 0,
-        event.ticketsSold?.total || 0,
-        dateStr,
-      ],
+    const data = [
+      {
+        range: `${this.config.sheetName}!E${rowIndex}:G${rowIndex}`,
+        values: [[
+          event.ticketsSold?.capacity || 0,
+          event.ticketsSold?.total || 0,
+          dateStr,
+        ]],
+      },
+      {
+        range: `${this.config.sheetName}!J${rowIndex}`,
+        values: [[unixTimestamp]],
+      },
     ];
 
     try {
-      await this.sheets.spreadsheets.values.update({
+      await this.sheets.spreadsheets.values.batchUpdate({
         spreadsheetId: this.config.spreadsheetId,
-        range,
-        valueInputOption: "USER_ENTERED",
-        requestBody: { values },
+        requestBody: {
+          data,
+          valueInputOption: "USER_ENTERED",
+        },
       });
       return true;
     } catch (error) {

@@ -13,6 +13,7 @@ export interface SheetRow {
     capacity: number;
     totalTicketsSold: number;
     lastSnapshotAt: string;
+    unixTimestamp?: number;
     eventStatus: string;
     eventFullName: string;
 }
