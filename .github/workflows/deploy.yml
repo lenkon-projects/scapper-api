@@ -74,8 +74,10 @@ jobs:
           echo "=== Environment file created with $(cat .env.production | wc -l) lines ==="
 
       - name: Create Google Sheets credentials file
+        env:
+          CREDS: ${{ secrets.GOOGLE_SHEETS_CREDENTIALS_JSON }}
         run: |
-          echo '${{ secrets.GOOGLE_SHEETS_CREDENTIALS_JSON }}' > credentials.json
+          echo "$CREDS" > credentials.json
 
       - name: Copy files to server
         uses: appleboy/scp-action@master
@@ -101,8 +103,9 @@ jobs:
             # Create output and logs directories with proper permissions
             # pptruser in the Puppeteer container has UID 10042
             mkdir -p output logs
-            chown -R 10042:10042 output logs
+            chown -R 10042:10042 output logs credentials.json
             chmod -R 755 output logs
+            chmod 644 credentials.json
 
             # Login to GitHub Container Registry
             echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
@@ -110,36 +113,28 @@ jobs:
             # Set GITHUB_REPOSITORY environment variable for docker-compose
             export GITHUB_REPOSITORY=${{ github.repository }}
 
-            # Pull latest image
-            docker compose pull
-
             # Stop and remove old containers (with volumes cleanup)
             docker compose down --remove-orphans
-
-            # Remove old images before starting new ones
-            docker image prune -af
 
             # Start new containers with fresh pull
             docker compose up -d --force-recreate --pull always
 
-            # Setup Cron Jobs (must run after containers are started)
-            chmod +x setup-docker-cron.sh
-            bash setup-docker-cron.sh
-
-            # Clean up unused volumes
-            docker volume prune -f
-
             # Show status
             echo "=== Container Status ==="
             docker compose ps
-
-            echo "=== Recent Logs ==="
-            docker compose logs --tail=50
 
             echo "Waiting for service to start (15s)..."
             sleep 15
 
             echo "Checking health endpoint..."
             curl -f http://127.0.0.1:3000/api/health || exit 1
+
+            # Setup Cron Jobs (must run after containers are started and healthy)
+            chmod +x scripts/setup-docker-cron.sh
+            ./scripts/setup-docker-cron.sh
+
+            # Clean up old images and unused volumes after successful deployment
+            docker image prune -f
+            docker volume prune -f
 
             echo "✅ Deployment successful!"
