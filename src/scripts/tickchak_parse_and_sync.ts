@@ -1,20 +1,19 @@
 import "dotenv/config";
-import { GoShowScraper } from "../core/goshow-scraper";
+import { TickchakScraper } from "../core/tickchak-scraper";
 import GoogleSheetsService from "../services/google-sheets.service";
 import { TelegramNotificationService } from "../bot/services/telegram-notification.service";
 import { Event } from "../core/types";
 
 /**
- * GoShow Parse & Sync Script
+ * Parse Tickchak & Sync Script
  *
- * Executes GoShow Manager parsing,
+ * Executes Tickchak parsing directly,
  * then syncs parsed events to Google Sheets.
  *
  * Features:
- * - GoShow Manager scraping with headless mode
- * - Automatic browser cleanup
- * - Converts GoShow events to sync format
- * - Syncs to Google Sheets with timestamp
+ * - Tickchak scraping
+ * - Converts Tickchak events to sync format
+ * - Syncs to Google Sheets with timestamp (Prefix: TC-)
  * - Comprehensive logging throughout
  * - Error notifications via Telegram
  * - Proper error handling with exit codes
@@ -22,57 +21,49 @@ import { Event } from "../core/types";
 
 async function main() {
   console.log("============================================================");
-  console.log("🎫 GoShow Parse & Sync");
+  console.log("🎫 Tickchak Parse & Sync");
   console.log("============================================================");
   console.log(`📅 Timestamp: ${new Date().toISOString()}`);
   console.log("");
 
   try {
     // ========================================
-    // Phase 1: Execute GoShow Parse
+    // Phase 1: Execute Tickchak Parse
     // ========================================
-    console.log("[GoShowSync] Phase 1: Starting GoShow parse...");
-    console.log("[GoShowSync] Parse options: headless=true, closeAfter=true");
-    console.log("");
-
-    const scraper = new GoShowScraper({
-      headless: true,
-      closeAfter: true,
-    });
-
-    const parseResult = await scraper.execute();
+    console.log("[TickchakSync] Phase 1: Starting Tickchak parse...");
+    
+    const scraper = new TickchakScraper();
+    await scraper.login();
+    const tickchakEvents = await scraper.getEvents();
 
     console.log("");
-    console.log("[GoShowSync] Parse completed successfully");
+    console.log("[TickchakSync] Parse completed successfully");
     console.log(
-      `[GoShowSync] Total events parsed: ${parseResult.events.length}`
+      `[TickchakSync] Total events parsed: ${tickchakEvents.length}`
     );
-    console.log(`[GoShowSync] Output file: ${parseResult.outputFile}`);
-    console.log(`[GoShowSync] Screenshot: ${parseResult.screenshotPath}`);
     console.log("");
 
     // ========================================
-    // Phase 2: Convert Events to Sync Format
+    // Phase 2: Convert Events to Generic Format
     // ========================================
     console.log(
-      "[GoShowSync] Phase 2: Converting events to sync format..."
+      "[TickchakSync] Phase 2: Converting events to generic format..."
     );
 
-    // All GoShow events are considered active
-    const activeEvents: Event[] = parseResult.events.map((e) => ({
-      active: true,
-      eventId: e.eventId,
+    const activeEvents: Event[] = tickchakEvents.map((e) => ({
+      active: true, // Assuming fetched events are active
+      eventId: e.eid.toString(),
       title: e.title,
       ticketsSold: {
-        total: e.ticketsSold.total,
-        capacity: e.ticketsSold.capacity,
+        total: e.tickets.sold,
+        capacity: e.tickets.amount,
       },
     }));
 
-    console.log(`[GoShowSync] Converted ${activeEvents.length} events`);
+    console.log(`[TickchakSync] Converted ${activeEvents.length} events`);
 
     if (activeEvents.length === 0) {
-      console.log("[GoShowSync] No events to sync. Exiting.");
+      console.log("[TickchakSync] No events to sync. Exiting.");
       process.exit(0);
     }
 
@@ -82,17 +73,19 @@ async function main() {
     // Phase 3: Sync to Google Sheets
     // ========================================
     const syncTimestamp = new Date();
-    console.log("[GoShowSync] Phase 3: Starting sync to Google Sheets...");
+    console.log("[TickchakSync] Phase 3: Starting sync to Google Sheets...");
     console.log(
-      `[GoShowSync] Using sync timestamp: ${syncTimestamp.toISOString()}`
+      `[TickchakSync] Using sync timestamp: ${syncTimestamp.toISOString()}`
     );
     console.log("");
 
     const sheetsService = GoogleSheetsService.getInstance();
+    
+    // Use TC- prefix for Tickchak events
     const result = await sheetsService.syncActiveEvents(
       activeEvents,
       syncTimestamp,
-      "GO-"
+      "TC-"
     );
 
     // ========================================
@@ -100,7 +93,7 @@ async function main() {
     // ========================================
     console.log("");
     console.log("─".repeat(60));
-    console.log("[GoShowSync] Google Sheets Sync Summary:");
+    console.log("[TickchakSync] Google Sheets Sync Summary:");
     console.log(`  Total Processed:     ${result.totalProcessed}`);
     console.log(`  Successful Updates:  ${result.successfulUpdates}`);
     console.log(`  Skipped:             ${result.skipped}`);
@@ -112,14 +105,14 @@ async function main() {
     // Phase 5: Exit with Appropriate Code
     // ========================================
     if (result.errors === result.totalProcessed && result.totalProcessed > 0) {
-      console.log("[GoShowSync] All events failed. Exiting with error code.");
+      console.log("[TickchakSync] All events failed. Exiting with error code.");
       process.exit(1);
     } else {
-      console.log("[GoShowSync] Parse and sync completed successfully.");
+      console.log("[TickchakSync] Parse and sync completed successfully.");
       process.exit(0);
     }
   } catch (error) {
-    console.error("[GoShowSync] Fatal error:");
+    console.error("[TickchakSync] Fatal error:");
 
     let errorObj: Error;
     if (error instanceof Error) {
@@ -136,19 +129,19 @@ async function main() {
     // Send notification to all Telegram users
     try {
       console.log(
-        "[GoShowSync] Sending error notification to Telegram users..."
+        "[TickchakSync] Sending error notification to Telegram users..."
       );
       const notificationService = TelegramNotificationService.getInstance();
       const formattedMessage = notificationService.formatErrorMessage(
         errorObj,
-        "GoShow Parse and Sync Script"
+        "Tickchak Parse and Sync Script"
       );
 
       const notifyResult = await notificationService.broadcastToAllUsers(
         formattedMessage
       );
       console.log(
-        `[GoShowSync] Notification sent: ${notifyResult.sent} successful, ${notifyResult.failed} failed`
+        `[TickchakSync] Notification sent: ${notifyResult.sent} successful, ${notifyResult.failed} failed`
       );
 
       if (notifyResult.failed > 0) {
@@ -156,12 +149,12 @@ async function main() {
           .filter((d) => !d.success)
           .map((d) => `User ${d.userId}: ${d.error}`)
           .join("\n  ");
-        console.error(`[GoShowSync] Failed notifications:\n  ${failedUsers}`);
+        console.error(`[TickchakSync] Failed notifications:\n  ${failedUsers}`);
       }
     } catch (notificationError) {
       // Don't let notification errors crash the script
       console.error(
-        "[GoShowSync] Failed to send Telegram notification:",
+        "[TickchakSync] Failed to send Telegram notification:",
         notificationError
       );
     }

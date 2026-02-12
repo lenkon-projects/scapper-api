@@ -19,9 +19,14 @@ export interface SheetRow {
 
 export interface SheetSyncDetail {
     eventId: string;
+    title?: string;
     status: 'updated' | 'skipped' | 'error';
     message?: string;
     rowIndex?: number;
+    inventory?: {
+        sold: number;
+        capacity?: number;
+    };
 }
 
 export interface SheetSyncResult {

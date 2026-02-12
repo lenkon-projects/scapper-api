@@ -6,6 +6,7 @@ export interface TicketData {
 export interface Event {
     active?: boolean;
     eventId?: string;
+    title?: string;
     ticketsSold?: TicketData;
 }
 

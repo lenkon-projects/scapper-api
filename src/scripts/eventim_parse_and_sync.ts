@@ -62,6 +62,7 @@ async function main() {
     const activeEvents: Event[] = parseResult.events.map((e) => ({
       active: true,
       eventId: e.eventId,
+      title: e.title,
       ticketsSold: {
         total: e.ticketsSold.total,
         capacity: e.ticketsSold.capacity,

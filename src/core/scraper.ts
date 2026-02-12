@@ -20,6 +20,11 @@ async function parseEventsTable(page: Page): Promise<Event[]> {
 
             const event: Event = {};
 
+            const titleEl = row.querySelector('td.column-title strong a');
+            if (titleEl) {
+                event.title = titleEl.textContent?.trim() || '';
+            }
+
             const activeEl = row.querySelector('td.column-event_active .tc-control');
             if (activeEl) {
                 event.active = activeEl.classList.contains('tc-on');

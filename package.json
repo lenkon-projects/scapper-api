@@ -17,6 +17,10 @@
     "eventim:sync:prod": "node dist/scripts/eventim_parse_and_sync.js",
     "goshow:sync:dev": "tsx src/scripts/goshow_parse_and_sync.ts",
     "goshow:sync:prod": "node dist/scripts/goshow_parse_and_sync.js",
+    "tickchak:sync:dev": "tsx src/scripts/tickchak_parse_and_sync.ts",
+    "tickchak:sync:prod": "node dist/scripts/tickchak_parse_and_sync.js",
+    "zygo:sync:dev": "tsx src/scripts/zygo_parse_and_sync.ts",
+    "zygo:sync:prod": "node dist/scripts/zygo_parse_and_sync.js",
     "test:sheets": "tsx src/scripts/test_google_sheets.ts"
   },
   "keywords": [

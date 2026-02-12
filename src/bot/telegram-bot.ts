@@ -7,6 +7,7 @@ import { executeParse } from "../core/scraper";
 import { EventimScraper } from "../core/eventim-scraper";
 import { GoShowScraper } from "../core/goshow-scraper";
 import ZygoScraper from "../core/zygo-scraper";
+import { TickchakScraper } from "../core/tickchak-scraper";
 import { Event } from "../core/types";
 import GoogleSheetsService from "../services/google-sheets.service";
 import ZygoTokenService from "../services/zygo-token.service";
@@ -148,6 +149,7 @@ export class TelegramBotService {
           `  • Ozen - Parse Ozen events\n` +
           `  • GoShow - Parse GoShow events\n` +
           `  • Zygo - Parse Zygo events\n` +
+          `  • Tickchak - Parse Tickchak events\n` +
           `/events - View events list from Google Sheets\n\n` +
           `*Authorization:*\n` +
           `/zygo_auth - Authorize Zygo account via SMS code\n\n` +
@@ -256,7 +258,9 @@ export class TelegramBotService {
         .row()
         .text("🎪 GoShow", "parse_goshow")
         .row()
-        .text("🏆 Zygo", "parse_zygo");
+        .text("🏆 Zygo", "parse_zygo")
+        .row()
+        .text("🎟 Tickchak", "parse_tickchak");
 
       await ctx.reply("📋 Select parsing source:", {
         reply_markup: keyboard,
@@ -438,6 +442,7 @@ export class TelegramBotService {
         parse_goshow: "🎪 GoShow",
         parse_eventim: "🎫 Eventim",
         parse_zygo: "🏆 Zygo",
+        parse_tickchak: "🎟 Tickchak",
         parse_both: "🔄 Both sources",
       };
 
@@ -454,6 +459,8 @@ export class TelegramBotService {
           await this.executeEventimParseAndSync(chatId);
         } else if (data === "parse_zygo") {
           await this.executeZygoParseAndSync(chatId);
+        } else if (data === "parse_tickchak") {
+          await this.executeTickchakParseAndSync(chatId);
         } else if (data === "parse_both") {
           await this.executeOzenParseAndSync(chatId);
           await this.executeEventimParseAndSync(chatId);
@@ -627,9 +634,14 @@ export class TelegramBotService {
   private formatSyncDetails(
     details: Array<{
       eventId?: string;
+      title?: string;
       status: string;
       message?: string;
       rowIndex?: number;
+      inventory?: {
+        sold: number;
+        capacity?: number;
+      };
     }>
   ): string | null {
     const errors = details.filter((d) => d.status === "error");
@@ -642,20 +654,32 @@ export class TelegramBotService {
     const parts: string[] = [];
 
     if (errors.length > 0) {
-      parts.push("❌ Errors:");
+      parts.push("❌ *Errors:*");
       errors.forEach((detail) => {
         const eventId = detail.eventId || "unknown";
+        const title = detail.title ? ` - ${detail.title}` : "";
         const message = detail.message || "Unknown error";
-        parts.push(`  • ${eventId}: ${message}`);
+        const inv = detail.inventory
+          ? ` (${detail.inventory.sold}${
+              detail.inventory.capacity ? `/${detail.inventory.capacity}` : ""
+            } sold)`
+          : "";
+        parts.push(`• \`${eventId}\`${title}${inv}: ${message}`);
       });
     }
 
     if (skipped.length > 0) {
-      parts.push("\n⚠️ Skipped:");
+      if (parts.length > 0) parts.push("");
+      parts.push("⚠️ *Skipped (Not in Sheets):*");
       skipped.forEach((detail) => {
         const eventId = detail.eventId || "unknown";
-        const message = detail.message || "No reason provided";
-        parts.push(`  • ${eventId}: ${message}`);
+        const title = detail.title ? ` - ${detail.title}` : "";
+        const inv = detail.inventory
+          ? ` (${detail.inventory.sold}${
+              detail.inventory.capacity ? `/${detail.inventory.capacity}` : ""
+            } sold)`
+          : "";
+        parts.push(`• \`${eventId}\`${title}${inv}`);
       });
     }
 
@@ -717,7 +741,9 @@ export class TelegramBotService {
     // Send detailed errors and skipped items if any
     const details = this.formatSyncDetails(syncResults.details);
     if (details) {
-      await this.bot.api.sendMessage(chatId, details);
+      await this.bot.api.sendMessage(chatId, details, {
+        parse_mode: "Markdown",
+      });
     }
   }
 
@@ -743,6 +769,7 @@ export class TelegramBotService {
     const activeEvents: Event[] = parseResult.events.map((e) => ({
       active: true,
       eventId: e.eventId,
+      title: e.title,
       ticketsSold: {
         total: e.ticketsSold.total,
         capacity: e.ticketsSold.capacity,
@@ -787,7 +814,9 @@ export class TelegramBotService {
     // Send detailed errors and skipped items if any
     const details = this.formatSyncDetails(syncResults.details);
     if (details) {
-      await this.bot.api.sendMessage(chatId, details);
+      await this.bot.api.sendMessage(chatId, details, {
+        parse_mode: "Markdown",
+      });
     }
   }
 
@@ -840,6 +869,7 @@ export class TelegramBotService {
       const activeEvents: Event[] = upcomingEvents.map((e) => ({
         active: true,
         eventId: e.identifier,
+        title: e.title,
         ticketsSold: {
           total: e.analytics?.approved || 0,
         },
@@ -886,11 +916,86 @@ export class TelegramBotService {
       // Send detailed errors and skipped items if any
       const details = this.formatSyncDetails(syncResults.details);
       if (details) {
-        await this.bot.api.sendMessage(chatId, details);
+        await this.bot.api.sendMessage(chatId, details, {
+          parse_mode: "Markdown",
+        });
       }
     } catch (error: any) {
       console.error("Error in Zygo parse and sync:", error);
       await this.bot.api.sendMessage(chatId, `❌ [Zygo] Error: ${error.message}`);
+    }
+  }
+
+  private async executeTickchakParseAndSync(chatId: number): Promise<void> {
+    await this.bot.api.sendMessage(
+      chatId,
+      "🎟 [Tickchak] Starting parsing...\n\nThis may take some time."
+    );
+
+    try {
+      const scraper = new TickchakScraper();
+      await scraper.login();
+      const tickchakEvents = await scraper.getEvents();
+
+      await this.bot.api.sendMessage(
+        chatId,
+        `✅ [Tickchak] Parsing completed!\n\n📊 Total events: ${tickchakEvents.length}`
+      );
+
+      if (tickchakEvents.length === 0) {
+        await this.bot.api.sendMessage(chatId, "⚠️ [Tickchak] No events found");
+        return;
+      }
+
+      // Convert Tickchak events to generic Event format
+      const activeEvents: Event[] = tickchakEvents.map((e) => ({
+        active: true,
+        eventId: e.eid.toString(),
+        title: e.title,
+        ticketsSold: {
+          total: e.tickets.sold,
+          capacity: e.tickets.amount,
+        },
+      }));
+
+      await this.bot.api.sendMessage(
+        chatId,
+        "🔄 [Tickchak] Starting sync with Google Sheets..."
+      );
+
+      const sheetsService = GoogleSheetsService.getInstance();
+      const syncTimestamp = new Date();
+      const syncResults = await sheetsService.syncActiveEvents(
+        activeEvents,
+        syncTimestamp,
+        "TC-"
+      );
+
+      const summary = [
+        "✅ [Tickchak] Sync completed!\n",
+        `📊 Google Sheets:`,
+        `• Processed: ${syncResults.totalProcessed}`,
+        `• Successfully updated: ${syncResults.successfulUpdates}`,
+        `• Skipped: ${syncResults.skipped}`,
+        `• Errors: ${syncResults.errors}`,
+      ];
+
+      summary.push(`\n⏰ Time: ${new Date().toISOString()}`);
+      await this.bot.api.sendMessage(chatId, summary.join("\n"));
+
+      // Send detailed errors and skipped items if any
+      const details = this.formatSyncDetails(syncResults.details);
+      if (details) {
+        await this.bot.api.sendMessage(chatId, details, {
+          parse_mode: "Markdown",
+        });
+      }
+    } catch (error: any) {
+      console.error("Error in Tickchak parse and sync:", error);
+      await this.bot.api.sendMessage(
+        chatId,
+        `❌ [Tickchak] Error: ${error.message}`
+      );
     }
   }
 
@@ -916,6 +1021,7 @@ export class TelegramBotService {
     const activeEvents: Event[] = parseResult.events.map((e) => ({
       active: true,
       eventId: e.eventId,
+      title: e.title,
       ticketsSold: {
         total: e.ticketsSold.total,
         capacity: e.ticketsSold.capacity,
@@ -960,7 +1066,9 @@ export class TelegramBotService {
     // Send detailed errors and skipped items if any
     const details = this.formatSyncDetails(syncResults.details);
     if (details) {
-      await this.bot.api.sendMessage(chatId, details);
+      await this.bot.api.sendMessage(chatId, details, {
+        parse_mode: "Markdown",
+      });
     }
   }
 
@@ -1012,6 +1120,7 @@ export class TelegramBotService {
       const activeEvents: Event[] = parseResult.events.map((e) => ({
         active: true,
         eventId: e.eventId,
+        title: e.title,
         ticketsSold: {
           total: e.ticketsSold.total,
           capacity: e.ticketsSold.capacity,
@@ -1051,7 +1160,9 @@ export class TelegramBotService {
       // Send detailed errors and skipped items if any
       const details = this.formatSyncDetails(syncResults.details);
       if (details) {
-        await this.bot.api.sendMessage(chatId, details);
+        await this.bot.api.sendMessage(chatId, details, {
+          parse_mode: "Markdown",
+        });
       }
     } catch (error) {
       console.error("Error processing Eventim static report:", error);

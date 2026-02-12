@@ -112,6 +112,7 @@ async function main() {
     const activeEvents: Event[] = upcomingEvents.map((e: any) => ({
       active: true,
       eventId: e.identifier,
+      title: e.title,
       ticketsSold: {
         total: e.analytics?.approved || 0,
       },

@@ -245,16 +245,23 @@ class GoogleSheetsService {
 
     for (const event of events) {
       result.totalProcessed++;
-      const eventId = event.eventId || "unknown";
-      const searchValue = `${prefix}${eventId}`;
+      const rawEventId = event.eventId || "unknown";
+      const eventIdWithPrefix = `${prefix}${rawEventId}`;
 
-      const item = allItems.find((row) => row.eventId === searchValue);
+      const item = allItems.find((row) => row.eventId === eventIdWithPrefix);
+
+      const inventory = {
+        sold: event.ticketsSold?.total || 0,
+        capacity: event.ticketsSold?.capacity,
+      };
 
       if (!item) {
         result.details.push({
-          eventId,
+          eventId: eventIdWithPrefix,
+          title: event.title,
           status: "skipped",
           message: "Not found in Google Sheets",
+          inventory,
         });
         result.skipped++;
         continue;
@@ -263,18 +270,22 @@ class GoogleSheetsService {
       try {
         await this.updateItem(item.rowIndex, event, timestamp);
         result.details.push({
-          eventId,
+          eventId: eventIdWithPrefix,
+          title: event.title,
           status: "updated",
           rowIndex: item.rowIndex,
+          inventory,
         });
         result.successfulUpdates++;
       } catch (error) {
         const message =
           error instanceof Error ? error.message : "Unknown error";
         result.details.push({
-          eventId,
+          eventId: eventIdWithPrefix,
+          title: event.title,
           status: "error",
           message,
+          inventory,
         });
         result.errors++;
       }

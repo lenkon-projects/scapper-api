@@ -9,6 +9,7 @@ CRON_JOBS=(
     "59 7-23 * * * docker exec wordpress-parser-api node /app/dist/scripts/ozen_parse_and_sync.js"
     "40 7-23 * * * docker exec wordpress-parser-api node /app/dist/scripts/goshow_parse_and_sync.js"
     "44 7-23 * * * docker exec wordpress-parser-api node /app/dist/scripts/zygo_parse_and_sync.js"
+    "35 7-23 * * * docker exec wordpress-parser-api node /app/dist/scripts/tickchak_parse_and_sync.js"
     "30 */3 * * * /usr/bin/docker restart wordpress-parser-api"
 )
 
