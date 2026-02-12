@@ -15,7 +15,6 @@ export interface SheetRow {
     lastSnapshotAt: string;
     unixTimestamp?: number;
     eventStatus: string;
-    eventFullName: string;
 }
 
 export interface SheetSyncDetail {

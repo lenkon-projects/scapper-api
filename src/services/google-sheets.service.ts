@@ -63,7 +63,7 @@ class GoogleSheetsService {
     try {
       const response = await this.sheets.spreadsheets.values.get({
         spreadsheetId: this.config.spreadsheetId,
-        range: `${this.config.sheetName}!A2:J`,
+        range: `${this.config.sheetName}!A2:I`,
       });
 
       const rows = response.data.values || [];
@@ -77,9 +77,8 @@ class GoogleSheetsService {
         capacity: parseInt(row[4]) || 0,
         totalTicketsSold: parseInt(row[5]) || 0,
         lastSnapshotAt: row[6] || "",
-        unixTimestamp: parseInt(row[9]) || 0,
-        eventStatus: row[7] || "",
-        eventFullName: row[8] || "",
+        unixTimestamp: parseInt(row[7]) || 0,
+        eventStatus: row[8] || "",
       }));
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unknown error";
@@ -117,28 +116,22 @@ class GoogleSheetsService {
     const dateStr = this.formatDate(timestamp);
     const unixTimestamp = Math.floor(timestamp.getTime() / 1000);
 
-    const data = [
-      {
-        range: `${this.config.sheetName}!E${rowIndex}:G${rowIndex}`,
-        values: [[
-          event.ticketsSold?.capacity || 0,
-          event.ticketsSold?.total || 0,
-          dateStr,
-        ]],
-      },
-      {
-        range: `${this.config.sheetName}!J${rowIndex}`,
-        values: [[unixTimestamp]],
-      },
+    const range = `${this.config.sheetName}!E${rowIndex}:H${rowIndex}`;
+    const values = [
+      [
+        event.ticketsSold?.capacity || 0,
+        event.ticketsSold?.total || 0,
+        dateStr,
+        unixTimestamp,
+      ],
     ];
 
     try {
-      await this.sheets.spreadsheets.values.batchUpdate({
+      await this.sheets.spreadsheets.values.update({
         spreadsheetId: this.config.spreadsheetId,
-        requestBody: {
-          data,
-          valueInputOption: "USER_ENTERED",
-        },
+        range,
+        valueInputOption: "USER_ENTERED",
+        requestBody: { values },
       });
       return true;
     } catch (error) {
@@ -159,7 +152,7 @@ class GoogleSheetsService {
     rowIndex: number,
     status: string
   ): Promise<boolean> {
-    const range = `${this.config.sheetName}!H${rowIndex}`;
+    const range = `${this.config.sheetName}!I${rowIndex}`;
     const values = [[status]];
 
     try {
