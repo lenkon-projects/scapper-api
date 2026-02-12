@@ -1,4 +1,5 @@
 import 'dotenv/config';
+import TickchakTokenService from '../services/tickchak-token.service';
 import { 
     TickchakLoginResponse, 
     TickchakEvent, 
@@ -14,8 +15,48 @@ export class TickchakScraper {
     
     private token: string | null = null;
     private userId: number | null = null;
+    private tokenService: TickchakTokenService;
 
-    async login(): Promise<void> {
+    constructor() {
+        this.tokenService = TickchakTokenService.getInstance();
+    }
+
+    private getHeaders(eid?: number) {
+        if (!this.token || !this.userId) {
+            throw new Error('Not logged in. Call login() first.');
+        }
+
+        return {
+            'accept': 'application/json, text/plain, */*',
+            'accept-language': 'ru-RU,ru;q=0.9,he-IL;q=0.8,he;q=0.7,en-GB;q=0.6,en;q=0.5,en-US;q=0.4',
+            'cache-control': 'no-cache',
+            'pragma': 'no-cache',
+            'priority': 'u=1, i',
+            'referer': eid ? `https://app.tickchak.co.il/e/${eid}/tickets` : 'https://app.tickchak.co.il/',
+            'sec-ch-ua': '"Not(A:Brand";v="8", "Chromium";v="144", "Google Chrome";v="144"',
+            'sec-ch-ua-mobile': '?0',
+            'sec-ch-ua-platform': '"macOS"',
+            'sec-fetch-dest': 'empty',
+            'sec-fetch-mode': 'cors',
+            'sec-fetch-site': 'same-origin',
+            'user-agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36',
+            'x-local-user-id': this.userId.toString(),
+            'Cookie': `tickchak_user_production=${this.token}`
+        };
+    }
+
+    async login(force: boolean = false): Promise<void> {
+        // Try to load from cache first
+        if (!force) {
+            const cached = this.tokenService.getTokens();
+            if (cached) {
+                console.log('🔑 Using cached Tickchak token');
+                this.token = cached.token;
+                this.userId = cached.userId;
+                return;
+            }
+        }
+
         const email = process.env.TICKCHAK_EMAIL;
         const password = process.env.TICKCHAK_PASSWORD;
 
@@ -58,6 +99,9 @@ export class TickchakScraper {
             this.token = data.tickchak_user_production;
             this.userId = data.user.globalUserId;
             
+            // Save to cache
+            this.tokenService.saveTokens(this.token, this.userId);
+            
             console.log('✅ Logged in successfully!');
             console.log(`👤 User: ${data.user.firstName} ${data.user.lastName} (ID: ${this.userId})`);
             
@@ -67,7 +111,7 @@ export class TickchakScraper {
         }
     }
 
-    async getEventTickets(eid: number): Promise<TickchakTicketType[]> {
+    async getEventTickets(eid: number, retry: boolean = true): Promise<TickchakTicketType[]> {
         if (!this.token || !this.userId) {
             throw new Error('Not logged in. Call login() first.');
         }
@@ -77,24 +121,14 @@ export class TickchakScraper {
         try {
             const response = await fetch(url, {
                 method: 'GET',
-                headers: {
-                    'accept': 'application/json, text/plain, */*',
-                    'accept-language': 'ru-RU,ru;q=0.9,he-IL;q=0.8,he;q=0.7,en-GB;q=0.6,en;q=0.5,en-US;q=0.4',
-                    'cache-control': 'no-cache',
-                    'pragma': 'no-cache',
-                    'priority': 'u=1, i',
-                    'referer': `https://app.tickchak.co.il/e/${eid}/tickets`,
-                    'sec-ch-ua': '"Not(A:Brand";v="8", "Chromium";v="144", "Google Chrome";v="144"',
-                    'sec-ch-ua-mobile': '?0',
-                    'sec-ch-ua-platform': '"macOS"',
-                    'sec-fetch-dest': 'empty',
-                    'sec-fetch-mode': 'cors',
-                    'sec-fetch-site': 'same-origin',
-                    'user-agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36',
-                    'x-local-user-id': this.userId.toString(),
-                    'Cookie': `tickchak_user_production=${this.token}`
-                }
+                headers: this.getHeaders(eid)
             });
+
+            if (response.status === 401 && retry) {
+                console.warn('⚠️ Tickchak token expired, retrying login...');
+                await this.login(true);
+                return this.getEventTickets(eid, false);
+            }
 
             if (!response.ok) {
                 const errorText = await response.text();
@@ -110,7 +144,7 @@ export class TickchakScraper {
         }
     }
 
-    async getEvents(): Promise<TickchakEvent[]> {
+    async getEvents(retry: boolean = true): Promise<TickchakEvent[]> {
         if (!this.token || !this.userId) {
             throw new Error('Not logged in. Call login() first.');
         }
@@ -129,24 +163,14 @@ export class TickchakScraper {
         try {
             const response = await fetch(url, {
                 method: 'GET',
-                headers: {
-                    'accept': 'application/json, text/plain, */*',
-                    'accept-language': 'ru-RU,ru;q=0.9,he-IL;q=0.8,he;q=0.7,en-GB;q=0.6,en;q=0.5,en-US;q=0.4',
-                    'cache-control': 'no-cache',
-                    'pragma': 'no-cache',
-                    'priority': 'u=1, i',
-                    'referer': 'https://app.tickchak.co.il/',
-                    'sec-ch-ua': '"Not(A:Brand";v="8", "Chromium";v="144", "Google Chrome";v="144"',
-                    'sec-ch-ua-mobile': '?0',
-                    'sec-ch-ua-platform': '"macOS"',
-                    'sec-fetch-dest': 'empty',
-                    'sec-fetch-mode': 'cors',
-                    'sec-fetch-site': 'same-origin',
-                    'user-agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36',
-                    'x-local-user-id': this.userId.toString(),
-                    'Cookie': `tickchak_user_production=${this.token}`
-                }
+                headers: this.getHeaders()
             });
+
+            if (response.status === 401 && retry) {
+                console.warn('⚠️ Tickchak token expired, retrying login...');
+                await this.login(true);
+                return this.getEvents(false);
+            }
 
             if (!response.ok) {
                 const errorText = await response.text();
@@ -171,14 +195,10 @@ export class TickchakScraper {
 
                 ticketsInfo.forEach(ticket => {
                     // Check if it's a "double ticket" (e.g. "כרטיס זוגי")
-                    // Note: "כרטיס זוגי" means "Couple Ticket" in Hebrew
                     const isDouble = ticket.title.includes('זוגי');
                     const multiplier = isDouble ? 2 : 1;
                     
                     totalSold += ticket.sold * multiplier;
-                    
-                    // Capacity is usually just the amount, but active tickets also have a 'limit'
-                    // The 'amount' seems to be the total allocation
                     totalCapacity += ticket.amount * multiplier;
                 });
                 
