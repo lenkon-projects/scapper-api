@@ -113,7 +113,6 @@ class GoogleSheetsService {
     event: Event,
     timestamp: Date
   ): Promise<boolean> {
-    const dateStr = this.formatDate(timestamp);
     const unixTimestamp = Math.floor(timestamp.getTime() / 1000);
 
     const range = `${this.config.sheetName}!E${rowIndex}:H${rowIndex}`;
@@ -121,7 +120,7 @@ class GoogleSheetsService {
       [
         event.ticketsSold?.capacity || 0,
         event.ticketsSold?.total || 0,
-        dateStr,
+        `=UNIX_TO_DATE(H${rowIndex})`,
         unixTimestamp,
       ],
     ];
