@@ -41,7 +41,10 @@ Thumbs.db
 # Docker local overrides (for development only)
 docker-compose.override.yml
 
-# Telegram data
-data/chat_ids.json
+# Telegram and Token data
+
+data/*.json
+
 env-secret-content.txt
+
 /*.json
